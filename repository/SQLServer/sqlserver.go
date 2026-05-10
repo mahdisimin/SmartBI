@@ -3,16 +3,16 @@ package SQLServer
 import (
 	"database/sql"
 	"fmt"
-	"net/url"
-
+	_ "github.com/denisenkom/go-mssqldb"
 	"github.com/jmoiron/sqlx"
+	"net/url"
 )
 
 const (
-	userName = "m.simin"
+	userName = "sa"
 	password = "123456"
-	uRL      = "10.1.52.13:1433"
-	database = "BRS_PreUpdate"
+	uRL      = "."
+	database = "SMARTBI"
 )
 
 type SqlServer struct {
