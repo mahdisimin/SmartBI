@@ -1,9 +1,14 @@
 package main
 
-import "log"
+import (
+	"fmt"
+	"intelligentBI/router"
+	"log"
+)
 
 func main() {
-	err := Router()
+	fmt.Println("hello world")
+	err := router.Router()
 	if err != nil {
 		log.Fatal(err)
 	}
