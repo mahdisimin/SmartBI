@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"intelligentBI/repository/SQLServer"
 	"intelligentBI/service"
 	"io"
 	"log"
@@ -13,7 +14,7 @@ func UserRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	var userRegResp service.UserRegisterResponse
 	var data = make([]byte, r.ContentLength)
 	var userServ = service.UserService{
-		Repository: nil,
+		Repository: SQLServer.SqlServer{},
 	}
 
 	if r.Method != http.MethodPost {

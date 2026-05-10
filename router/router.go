@@ -11,7 +11,7 @@ func Router() error {
 	mux.HandleFunc("/healthcheck", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
 	mux.HandleFunc("/user/register", handler.UserRegisterHandler)
 
-	log.Println("Server is running on Localhost:8090")
+	log.Println("Server is running on Localhost:8090 ...")
 	if err := http.ListenAndServe("localhost:8090", mux); err != nil {
 		log.Printf("error on HTTP request , %v", err)
 		return err
