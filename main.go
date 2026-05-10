@@ -1,7 +1,10 @@
 package main
 
-import "fmt"
+import "log"
 
 func main() {
-	fmt.Println("hello world")
+	err := Router()
+	if err != nil {
+		log.Fatal(err)
+	}
 }

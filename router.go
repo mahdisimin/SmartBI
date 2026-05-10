@@ -1,0 +1,19 @@
+package main
+
+import (
+	"intelligentBI/handler"
+	"log"
+	"net/http"
+)
+
+func Router() error {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/healthcheck", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
+	mux.HandleFunc("/user/register", handler.UserRegisterHandler)
+
+	if err := http.ListenAndServe("localhost:8080", mux); err != nil {
+		log.Printf("error on HTTP request , %v", err)
+		return err
+	}
+	return nil
+}
