@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SmartBI API Playground</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/config.js"></script>
+    <script type="module" src="/js/app.js"></script>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">Internal Development Tool</p>
+          <h1>SmartBI API Playground</h1>
+          <p class="description">
+            Minimal controls for exercising backend endpoints and inspecting request/response flow.
+          </p>
+        </div>
+      </header>
+
+      <section class="config-panel" aria-labelledby="config-title">
+        <div>
+          <h2 id="config-title">API Configuration</h2>
+          <p>Leave the base URL empty when testing against this same server.</p>
+        </div>
+        <label class="field base-url-field">
+          <span>Base API URL</span>
+          <input id="base-url" type="url" placeholder="http://localhost:8090" autocomplete="off" />
+        </label>
+      </section>
+
+      <section class="endpoint-list" aria-label="API endpoints" id="endpoint-list"></section>
+    </main>
+  </body>
+</html>
