@@ -12,8 +12,6 @@ func Router() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthcheck", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
 	mux.HandleFunc("/config.js", configHandler)
-	mux.HandleFunc("/documents", documentsHandler)
-	mux.HandleFunc("/documents/", documentsHandler)
 	mux.HandleFunc("/user/register", handler.UserRegisterHandler)
 	mux.HandleFunc("/user/login", handler.UserLoginHandler)
 	mux.Handle("/", http.FileServer(http.Dir("web")))
@@ -35,8 +33,4 @@ func configHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("window.SMARTBI_API_BASE_URL = "))
 	w.Write(baseURL)
 	w.Write([]byte(";"))
-}
-
-func documentsHandler(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "web/documents/index.html")
 }

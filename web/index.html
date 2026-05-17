@@ -3,99 +3,35 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>SmartBI Wellness</title>
+    <title>SmartBI API Playground</title>
     <link rel="stylesheet" href="/styles.css" />
-    <script type="module" src="/js/home.js"></script>
+    <script src="/config.js"></script>
+    <script type="module" src="/js/app.js"></script>
   </head>
-  <body class="landing-page">
-    <div class="ambient-shape ambient-shape--one"></div>
-    <div class="ambient-shape ambient-shape--two"></div>
-    <div class="ambient-shape ambient-shape--three"></div>
-
-    <header class="landing-nav">
-      <a class="brand-mark" href="/" aria-label="SmartBI home">
-        <span class="brand-mark__icon">✦</span>
-        <span>SmartBI</span>
-      </a>
-      <nav class="nav-links" aria-label="Primary navigation">
-        <a href="#approach">Approach</a>
-        <a href="#features">Features</a>
-        <a href="#journey">Journey</a>
-        <a href="/documents">API Docs</a>
-      </nav>
-    </header>
-
-    <main>
-      <section class="hero-section reveal-section">
-        <div class="hero-copy">
-          <p class="soft-label">Mindful insights for better days</p>
-          <h1>Understand your inner patterns with clarity, care, and calm.</h1>
-          <p class="hero-description">
-            A psychology-inspired space for reflective analytics, supportive guidance, and gentle progress.
-            Built to feel human before it feels technical.
-          </p>
-          <div class="hero-actions">
-            <a class="primary-cta" href="#features">Explore the experience</a>
-            <a class="secondary-cta" href="/documents">Open API Playground</a>
-          </div>
-        </div>
-
-        <aside class="wellness-card" aria-label="Daily reflection preview">
-          <div class="pulse-orb"></div>
-          <p class="soft-label">Today’s reflection</p>
-          <h2>Small pauses create room for meaningful insight.</h2>
-          <div class="mood-row">
-            <span>Calm</span>
-            <div class="mood-meter"><span style="width: 76%"></span></div>
-            <strong>76%</strong>
-          </div>
-          <div class="reflection-note">
-            <span>Gentle prompt</span>
-            <p>What felt lighter today, even for a moment?</p>
-          </div>
-        </aside>
-      </section>
-
-      <section class="content-section reveal-section" id="approach">
-        <div class="section-heading">
-          <p class="soft-label">A softer approach</p>
-          <h2>Designed around emotional context, not just data points.</h2>
-          <p>
-            SmartBI blends calm presentation, thoughtful prompts, and simple progress cues so insights feel
-            supportive rather than overwhelming.
-          </p>
-        </div>
-      </section>
-
-      <section class="feature-section reveal-section" id="features">
-        <article class="feature-card">
-          <span class="feature-icon">☁</span>
-          <h3>Calm summaries</h3>
-          <p>Turn complex signals into approachable reflections that are easy to revisit and understand.</p>
-        </article>
-        <article class="feature-card">
-          <span class="feature-icon">◐</span>
-          <h3>Pattern awareness</h3>
-          <p>Notice gentle trends across moods, habits, and personal rhythms without harsh dashboards.</p>
-        </article>
-        <article class="feature-card">
-          <span class="feature-icon">✺</span>
-          <h3>Supportive nudges</h3>
-          <p>Encourage small next steps with humane prompts, soft pacing, and reassuring visual feedback.</p>
-        </article>
-      </section>
-
-      <section class="journey-section reveal-section" id="journey">
+  <body>
+    <main class="shell">
+      <header class="page-header">
         <div>
-          <p class="soft-label">The product journey</p>
-          <h2>A landing experience ready for the future UI.</h2>
-          <p>
-            The public homepage now communicates the wellness direction, while developer tooling remains available
-            separately for fast backend testing.
+          <p class="eyebrow">Internal Development Tool</p>
+          <h1>SmartBI API Playground</h1>
+          <p class="description">
+            Minimal controls for exercising backend endpoints and inspecting request/response flow.
           </p>
         </div>
-        <a class="primary-cta" href="/documents">Visit developer documents</a>
+      </header>
+
+      <section class="config-panel" aria-labelledby="config-title">
+        <div>
+          <h2 id="config-title">API Configuration</h2>
+          <p>Leave the base URL empty when testing against this same server.</p>
+        </div>
+        <label class="field base-url-field">
+          <span>Base API URL</span>
+          <input id="base-url" type="url" placeholder="http://localhost:8090" autocomplete="off" />
+        </label>
       </section>
+
+      <section class="endpoint-list" aria-label="API endpoints" id="endpoint-list"></section>
     </main>
   </body>
 </html>
