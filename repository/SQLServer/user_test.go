@@ -10,8 +10,8 @@ func TestSqlServer_PersistUser(t *testing.T) {
 		Repository: SqlServer{},
 	}
 	Req := service.UserRegisterRequest{
-		UserName:    "Mahdi",
-		PhoneNumber: "09201008697",
+		UserName:    "TestUser",
+		PhoneNumber: "09201008700",
 		Password:    "123456",
 	}
 	_, err := userServ.Register(Req)
@@ -20,14 +20,16 @@ func TestSqlServer_PersistUser(t *testing.T) {
 	}
 }
 
-func TestSqlServer_Connect(t *testing.T) {
-	db, err := connect()
+func TestSqlServer_Login(t *testing.T) {
+	userServ := &service.UserService{
+		Repository: SqlServer{},
+	}
+	req := service.UserLoginRequest{
+		PhoneNumber: "09201008700",
+		Password:    "123456",
+	}
+	_, err := userServ.Login(req)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
 }
-
-//func TestSqlServer_IsPhoneNumberExists(t *testing.T) {
-//
-//}

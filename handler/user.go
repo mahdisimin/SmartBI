@@ -64,3 +64,58 @@ func UserRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
+
+func UserLoginHandler(w http.ResponseWriter, r *http.Request) {
+	var userLoginReq service.UserLoginRequest
+	var userLoginResp service.UserLoginResponse
+	var data = make([]byte, r.ContentLength)
+	var userServ = service.UserService{
+		Repository: SQLServer.SqlServer{},
+	}
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		log.Printf("error on HTTP request , wrong method")
+
+		return
+	}
+	dataTemp, err := io.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		log.Printf("error on HTTP request , read body error : %v", err)
+
+		return
+	} else {
+		data = dataTemp
+	}
+	if err := json.Unmarshal(data, &userLoginReq); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		log.Printf("error on HTTP request , unmarshal user login request error : %v", err)
+
+		return
+	}
+	userLoginRespTemp, err := userServ.Login(userLoginReq)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(err.Error()))
+		log.Printf("error on HTTP request , login error : %v", err)
+		return
+	} else {
+		userLoginResp = userLoginRespTemp
+	}
+	userLoginRespData, err := json.Marshal(userLoginResp)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(err.Error()))
+		log.Printf("error on HTTP request , marshal user login response error : %v", err)
+
+		return
+	}
+	if _, err := w.Write(userLoginRespData); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(err.Error()))
+		log.Printf("error on HTTP request , write response error : %v", err)
+
+		return
+	}
+
+}

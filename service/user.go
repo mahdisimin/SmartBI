@@ -12,6 +12,8 @@ type UserService struct {
 type Repo interface {
 	IsPhoneNumberExists(phoneNumber string) (bool, error)
 	PersistUser(string, string, string) (int64, error)
+	GetPasswordByPhoneNumber(phoneNumber string) (string, error)
+	GetUserIDByPhoneNumber(phoneNumber string) (int64, error)
 }
 
 func NewUserService(repo Repo) *UserService {
@@ -53,4 +55,46 @@ func (u UserService) Register(request UserRegisterRequest) (response UserRegiste
 	return UserRegisterResponse{
 		UserId: userID,
 	}, nil
+}
+
+type UserLoginRequest struct {
+	PhoneNumber string `json:"phone_number"`
+	Password    string `json:"password"`
+}
+type UserLoginResponse struct {
+	UserId int64 `json:"user_id"`
+}
+
+func (u UserService) Login(request UserLoginRequest) (response UserLoginResponse, err error) {
+	var password string
+	var userId int64
+	if isExists, err := u.Repository.IsPhoneNumberExists(request.PhoneNumber); err != nil || !isExists {
+		if err != nil {
+			return response, fmt.Errorf("database error %v", err)
+		} else if !isExists {
+			return response, fmt.Errorf("phone number %s does NOT exists", request.PhoneNumber)
+		}
+	}
+
+	passwordTemp, err := u.Repository.GetPasswordByPhoneNumber(request.PhoneNumber)
+	if err != nil {
+		return response, fmt.Errorf("database error: %v", err)
+	} else {
+		password = passwordTemp
+	}
+	hashedPassword := pkg.HashStringMD5(request.Password)
+	if hashedPassword != password {
+		return response, fmt.Errorf("password is NOT correct")
+	}
+
+	if userIdTemp, err := u.Repository.GetUserIDByPhoneNumber(request.PhoneNumber); err != nil {
+		return response, fmt.Errorf("database error: %v", err)
+	} else {
+		userId = userIdTemp
+	}
+
+	response = UserLoginResponse{
+		UserId: userId,
+	}
+	return response, nil
 }
