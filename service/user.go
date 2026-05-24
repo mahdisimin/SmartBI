@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"intelligentBI/entity"
 	"intelligentBI/pkg"
 )
 
@@ -14,6 +15,7 @@ type Repo interface {
 	PersistUser(string, string, string) (int64, error)
 	GetPasswordByPhoneNumber(phoneNumber string) (string, error)
 	GetUserIDByPhoneNumber(phoneNumber string) (int64, error)
+	GetUserByUserID(userID int64) (entity.User, error)
 }
 
 func NewUserService(repo Repo) *UserService {
@@ -95,6 +97,35 @@ func (u UserService) Login(request UserLoginRequest) (response UserLoginResponse
 
 	response = UserLoginResponse{
 		UserId: userId,
+	}
+	return response, nil
+}
+
+type UserProfileRequest struct {
+	UserID int64
+}
+type UserProfileResponse struct {
+	UserName     string              `json:"user_name"`
+	UserPhone    string              `json:"user_phone"`
+	UserLinkList []entity.WebAppList `json:"user_link_list"`
+}
+
+func (u UserService) Profile(request UserProfileRequest) (response UserProfileResponse, err error) {
+	var userName string
+	var userLinkList []entity.WebAppList
+	var userPhoneNumber string
+	userTemp, err := u.Repository.GetUserByUserID(request.UserID)
+	if err != nil {
+		return response, fmt.Errorf("database error: %v", err)
+	} else {
+		userName = userTemp.UserName
+		userLinkList = userTemp.WebAppList
+		userPhoneNumber = userTemp.PhoneNumber
+	}
+	response = UserProfileResponse{
+		UserName:     userName,
+		UserLinkList: userLinkList,
+		UserPhone:    userPhoneNumber,
 	}
 	return response, nil
 }

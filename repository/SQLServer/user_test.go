@@ -33,3 +33,21 @@ func TestSqlServer_Login(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestSqlServer_GetUserByUserID(t *testing.T) {
+	s := SqlServer{}
+	user, err := s.GetUserByUserID(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("%+v", user)
+}
+
+func TestSqlServer_GetUserLinkListByUserID(t *testing.T) {
+	s := SqlServer{}
+	Links, err := s.GetUserLinkListByUserID(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(Links)
+}

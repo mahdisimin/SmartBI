@@ -3,6 +3,7 @@ package SQLServer
 import (
 	"database/sql"
 	"fmt"
+	"intelligentBI/entity"
 	"net/url"
 
 	_ "github.com/denisenkom/go-mssqldb"
@@ -10,18 +11,6 @@ import (
 )
 
 type SqlServer struct {
-}
-
-func connect() (*sqlx.DB, error) {
-	var sqlDB *sqlx.DB
-	pass := url.QueryEscape(password)
-	connString := fmt.Sprintf("sqlserver://%s:%s@%s?database=%s", userName, pass, uRL, database)
-	if dbtemp, err := sqlx.Open("mssql", connString); err != nil {
-		return nil, err
-	} else {
-		sqlDB = dbtemp
-	}
-	return sqlDB, nil
 }
 
 func (s SqlServer) IsPhoneNumberExists(phoneNumber string) (bool, error) {
@@ -90,4 +79,72 @@ func (s SqlServer) GetUserIDByPhoneNumber(phoneNumber string) (int64, error) {
 		return 0, err
 	}
 	return userId, nil
+}
+
+func (s SqlServer) GetUserByUserID(userID int64) (entity.User, error) {
+	var user entity.User
+	var userLinkList []entity.WebAppList
+	db, err := connect()
+	if err != nil {
+		return user, err
+	}
+	defer db.Close()
+
+	errTemp := db.Get(&user, "SELECT UserName , PhoneNumber , Password FROM APP.[USER] WHERE ID = ?", userID)
+	if errTemp != nil {
+		return user, errTemp
+	}
+
+	userLinkListTemp, errTemp := s.GetUserLinkListByUserID(userID)
+	if errTemp != nil {
+		return user, errTemp
+	} else {
+		userLinkList = append(userLinkList, userLinkListTemp...)
+	}
+
+	user.WebAppList = userLinkList
+
+	return user, nil
+}
+
+func (s SqlServer) GetUserLinkListByUserID(userID int64) ([]entity.WebAppList, error) {
+	var WebAppsTempDB []entity.WebAppListDB
+	var WebApps []entity.WebAppList
+
+	db, err := connect()
+	if err != nil {
+		return WebApps, err
+	}
+	defer db.Close()
+
+	errTemp := db.Select(&WebAppsTempDB, "SELECT WebAppName ,WebAppLink AS WebAppURL  FROM APP.GetUserListByID WHERE UserID = ?", userID)
+	if errTemp != nil {
+		return WebApps, errTemp
+	}
+
+	for _, WebApp := range WebAppsTempDB {
+		WebAppName := ""
+		if WebApp.WebAppName.Valid {
+			WebAppName = WebApp.WebAppName.String
+		}
+		WebAppURL := ""
+		if WebApp.WebAppURL.Valid {
+			WebAppURL = WebApp.WebAppURL.String
+		}
+		WebApps = append(WebApps, entity.WebAppList{WebAppName, WebAppURL})
+	}
+
+	return WebApps, nil
+}
+
+func connect() (*sqlx.DB, error) {
+	var sqlDB *sqlx.DB
+	pass := url.QueryEscape(password)
+	connString := fmt.Sprintf("sqlserver://%s:%s@%s?database=%s", userName, pass, uRL, database)
+	if dbtemp, err := sqlx.Open("mssql", connString); err != nil {
+		return nil, err
+	} else {
+		sqlDB = dbtemp
+	}
+	return sqlDB, nil
 }

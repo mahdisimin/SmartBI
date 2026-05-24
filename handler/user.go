@@ -7,6 +7,9 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
+
+	"github.com/gorilla/mux"
 )
 
 func UserRegisterHandler(w http.ResponseWriter, r *http.Request) {
@@ -118,4 +121,64 @@ func UserLoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+}
+
+func UserProfileHandler(w http.ResponseWriter, r *http.Request) {
+	var userId int64
+	var userProfileResp service.UserProfileResponse
+	var userServ = service.UserService{
+		Repository: SQLServer.SqlServer{},
+	}
+	params := mux.Vars(r)
+
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		log.Printf("error on HTTP request , wrong method")
+
+		return
+	}
+	idStr := params["id"]
+	if idStr == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		log.Printf("error on HTTP request , empty user id : %s", idStr)
+
+		return
+	}
+	userIDTemp, err := strconv.Atoi(idStr)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		log.Printf("error on HTTP request , convert to int error : %v", err)
+
+		return
+	} else {
+		userId = int64(userIDTemp)
+	}
+
+	userProfileRequest := service.UserProfileRequest{
+		UserID: userId,
+	}
+	userProfileRespTemp, err := userServ.Profile(userProfileRequest)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		log.Printf("error on HTTP request , call service : %v", err)
+
+		return
+	} else {
+		userProfileResp = userProfileRespTemp
+	}
+	userProfileRespData, err := json.Marshal(userProfileResp)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(err.Error()))
+		log.Printf("error on HTTP request , marshal user profile response error : %v", err)
+
+		return
+	}
+	if _, err := w.Write(userProfileRespData); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(err.Error()))
+		log.Printf("error on HTTP request , write response error : %v", err)
+
+		return
+	}
 }
