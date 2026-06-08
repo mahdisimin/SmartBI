@@ -2,6 +2,7 @@ package router
 
 import (
 	"intelligentBI/handler"
+	"intelligentBI/middlewear"
 	"log"
 	"net/http"
 
@@ -15,8 +16,8 @@ func Router() error {
 	mux.HandleFunc("/user/login", handler.UserLoginHandler)
 	mux.HandleFunc("/user/user_profile/{id}", handler.UserProfileHandler)
 
-	log.Println("Server is running on Localhost:8090 ...")
-	if err := http.ListenAndServe("localhost:8090", mux); err != nil {
+	log.Println("Server is running on Localhost:8091 ...")
+	if err := http.ListenAndServe("localhost:8091", middlewear.CorsMiddleware(mux)); err != nil {
 		log.Printf("error on HTTP request , %v", err)
 		return err
 	}

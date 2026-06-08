@@ -2,6 +2,7 @@ import { Navigate, Outlet } from 'react-router-dom'
 import { useAuthStore } from '@/hooks/useAuthStore'
 
 export const AuthGuard = () => {
-    const token = useAuthStore((s) => s.token)
-    return token ? <Outlet /> : <Navigate to="/login" replace />
+    // Currently guarding by userId — will switch to token once JWT is implemented
+    const userId = useAuthStore((s) => s.userId)
+    return userId !== null ? <Outlet /> : <Navigate to="/login" replace />
 }

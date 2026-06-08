@@ -1,3 +1,5 @@
+import { DashboardList } from '@/features/dashboards/components/DashboardList'
+
 export default function DashboardsPage() {
-    return <div className="text-foreground">Dashboards Page — coming soon</div>
+    return <DashboardList />
 }

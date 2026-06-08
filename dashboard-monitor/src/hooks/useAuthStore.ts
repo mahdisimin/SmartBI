@@ -1,27 +1,34 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-
-interface User {
-    id: string
-    email: string
-    name: string
-}
+import type { User } from '@/types/auth.types'
 
 interface AuthState {
-    token: string | null
+    // Current auth state — no token yet, will be added in future JWT phase
+    userId: number | null
     user: User | null
-    setAuth: (token: string, user: User) => void
+
+    // Actions
+    setUserId: (userId: number) => void
+    setUser: (user: User) => void
     clearAuth: () => void
+
+    // Future JWT integration point — token is stored but unused for now
+    token: string | null
+    setToken: (token: string) => void
 }
 
 export const useAuthStore = create<AuthState>()(
     persist(
-    (set) => ({
-        token: null,
-        user: null,
-        setAuth: (token, user) => set({ token, user }),
-        clearAuth: () => set({ token: null, user: null }),
-    }),
-    { name: 'auth-storage' }
+        (set) => ({
+            userId: null,
+            user: null,
+            token: null,
+
+            setUserId: (userId) => set({ userId }),
+            setUser: (user) => set({ user }),
+            setToken: (token) => set({ token }),
+            clearAuth: () => set({ userId: null, user: null, token: null }),
+        }),
+        { name: 'auth-storage' }
     )
 )
