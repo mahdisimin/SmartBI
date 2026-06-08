@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"intelligentBI/repository/SQLServer"
 	"intelligentBI/service"
 	"io"
@@ -75,6 +76,7 @@ func UserLoginHandler(w http.ResponseWriter, r *http.Request) {
 	var userServ = service.UserService{
 		Repository: SQLServer.SqlServer{},
 	}
+	fmt.Println(r.Method)
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		log.Printf("error on HTTP request , wrong method")
