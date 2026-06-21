@@ -18,6 +18,17 @@ export interface UserProfileResponse {
     }[]
 }
 
+export interface RegisterRequest {
+    user_name: string
+    phone_number: string
+    password: string
+}
+
+// UserId uses capital casing — the Go struct has no json tag, so it serializes as-is
+export interface RegisterResponse {
+    UserId: number
+}
+
 export const authApi = {
     login: async (data: LoginRequest): Promise<LoginResponse> => {
         const response = await apiClient.post<LoginResponse>('/user/login', data)
@@ -28,6 +39,11 @@ export const authApi = {
         const response = await apiClient.get<UserProfileResponse>(
             `/user/user_profile/${userId}`
         )
+        return response.data
+    },
+
+    register: async (data: RegisterRequest): Promise<RegisterResponse> => {
+        const response = await apiClient.post<RegisterResponse>('/user/register', data)
         return response.data
     },
 }

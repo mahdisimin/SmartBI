@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Eye, EyeOff, Loader2, Phone, Lock } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useLogin } from '@/features/auth/hooks/useLogin'
 
 export const LoginForm = () => {
@@ -99,6 +100,13 @@ export const LoginForm = () => {
                         'Sign in'
                     )}
                 </button>
+
+                <p className="text-center text-sm text-muted-foreground pt-2">
+                    Don't have an account?{' '}
+                    <Link to="/register" className="text-primary hover:underline font-medium">
+                        Create one
+                    </Link>
+                </p>
             </form>
         </div>
     )
