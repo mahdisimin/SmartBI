@@ -19,7 +19,7 @@ export const useLogin = (): UseLoginReturn => {
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const navigate = useNavigate()
-    const { setUserId, setUser } = useAuthStore()
+    const { setUserId, setUser, clearAuth } = useAuthStore()
 
     const login = async (form: LoginForm) => {
         setIsLoading(true)
@@ -43,16 +43,18 @@ export const useLogin = (): UseLoginReturn => {
                 id: loginResponse.user_id,
                 userName: profile.user_name,
                 phoneNumber: profile.user_phone,
-                webAppList: profile.user_link_list.map((item) => ({
-                    webAppName: item.WebAppName,
-                    webAppURL: item.WebAppURL,
-                })),
+                webAppList: (profile.user_link_list ?? [])
+                    .filter((item) => item.WebAppURL?.trim())
+                    .map((item) => ({
+                        webAppName: item.WebAppName,
+                        webAppURL: item.WebAppURL,
+                    })),
             }
 
             setUser(user)
             navigate('/', { replace: true })
         } catch {
-            // TODO: When backend returns structured errors, parse and display them here
+            clearAuth()
             setError('Username or password is incorrect.')
         } finally {
             setIsLoading(false)
