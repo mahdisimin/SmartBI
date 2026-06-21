@@ -1,13 +1,17 @@
 package main
 
 import (
-	"intelligentBI/router"
+	echowebframework "intelligentBI/delivery/echo/router"
 	"log"
 )
 
 func main() {
-	err := router.Router()
-	if err != nil {
+	//err := nethttp.Router()
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+
+	if err := echowebframework.Router(); err != nil {
 		log.Fatal(err)
 	}
 }
