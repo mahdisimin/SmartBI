@@ -1,12 +1,12 @@
 package main
 
 import (
-	"intelligentBI/router"
+	"intelligentBI/delivery/nethttp/router"
 	"log"
 )
 
 func main() {
-	err := router.Router()
+	err := nethttp.Router()
 	if err != nil {
 		log.Fatal(err)
 	}

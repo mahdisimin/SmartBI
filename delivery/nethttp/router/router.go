@@ -1,7 +1,7 @@
-package router
+package nethttp
 
 import (
-	"intelligentBI/handler"
+	"intelligentBI/delivery/nethttp/handler"
 	"intelligentBI/middlewear"
 	"log"
 	"net/http"
@@ -12,9 +12,9 @@ import (
 func Router() error {
 	mux := muxlib.NewRouter()
 	mux.HandleFunc("/healthcheck", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
-	mux.HandleFunc("/user/register", handler.UserRegisterHandler)
-	mux.HandleFunc("/user/login", handler.UserLoginHandler)
-	mux.HandleFunc("/user/user_profile/{id}", handler.UserProfileHandler)
+	mux.HandleFunc("/user/register", nethttp.UserRegisterHandler)
+	mux.HandleFunc("/user/login", nethttp.UserLoginHandler)
+	mux.HandleFunc("/user/user_profile/{id}", nethttp.UserProfileHandler)
 
 	log.Println("Server is running on Localhost:8091 ...")
 	if err := http.ListenAndServe("localhost:8091", middlewear.CorsMiddleware(mux)); err != nil {
