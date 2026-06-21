@@ -1,4 +1,4 @@
-package handler
+package nethttp
 
 import (
 	"encoding/json"

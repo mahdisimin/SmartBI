@@ -1,4 +1,4 @@
-import { Activity } from 'lucide-react'
+import { Activity, ShieldOff } from 'lucide-react'
 import { DashboardCard } from './DashboardCard'
 import { useAuthStore } from '@/hooks/useAuthStore'
 
@@ -41,13 +41,16 @@ export const DashboardList = () => {
 }
 
 const EmptyState = () => (
-    <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-border rounded-2xl max-w-lg">
-        <div className="w-14 h-14 rounded-2xl bg-muted border border-border flex items-center justify-center mb-5">
-            <Activity size={22} className="text-muted-foreground" />
+    <div className="flex flex-col items-center justify-center py-24 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-5">
+            <ShieldOff size={24} className="text-muted-foreground" />
         </div>
-        <p className="text-sm font-semibold text-foreground mb-1.5">No platforms connected</p>
-        <p className="text-xs text-muted-foreground max-w-[240px] leading-relaxed">
-            Contact your administrator to configure platform access for your account.
+        <p className="text-base font-semibold text-foreground mb-2">
+            No dashboard access
+        </p>
+        <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
+            Your account has not been granted access to any dashboards yet.
+            Please contact your administrator.
         </p>
     </div>
 )

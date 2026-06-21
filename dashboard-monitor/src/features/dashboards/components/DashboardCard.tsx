@@ -17,7 +17,7 @@ const palette = [
 ]
 
 function getColor(name: string) {
-    return palette[name.charCodeAt(0) % palette.length]
+    return palette[(name.charCodeAt(0) || 0) % palette.length]
 }
 
 export const DashboardCard = ({ app }: DashboardCardProps) => {
