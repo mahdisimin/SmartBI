@@ -1,9 +1,10 @@
 package SQLServer
 
 import (
-	external "intelligentBI/external/synops"
+	external "intelligentBI/external/synops/ver1"
 	"intelligentBI/pkg"
 	"testing"
+	"time"
 )
 
 func TestSynops_LoginHostory(t *testing.T) {
@@ -15,25 +16,25 @@ func TestSynops_LoginHostory(t *testing.T) {
 			IpAddress: "127.0.0.1",
 			Country:   "unknown",
 			UserAgent: "PostmanRuntime/7.48.0",
-
+			TimeStamp: time.Now(),
 			IsSuccess: false,
 		}, external.LoginHistoryResBodydata{
 			IpAddress: "127.0.0.2",
 			Country:   "unknown",
 			UserAgent: "PostmanRuntime/7.48.0",
-
+			TimeStamp: time.Now(),
 			IsSuccess: false,
 		}, external.LoginHistoryResBodydata{
 			IpAddress: "127.0.0.3",
 			Country:   "unknown",
 			UserAgent: "PostmanRuntime/7.48.0",
-
+			TimeStamp: time.Now(),
 			IsSuccess: false,
 		}, external.LoginHistoryResBodydata{
 			IpAddress: "127.0.0.4",
 			Country:   "unknown",
 			UserAgent: "PostmanRuntime/7.48.0",
-
+			TimeStamp: time.Now(),
 			IsSuccess: false,
 		},
 	}
@@ -49,7 +50,7 @@ func TestSynops_LoginHostory(t *testing.T) {
 		},
 	}
 
-	if err := synopsServ.LoginHostory(data); err != nil {
+	if err := synopsServ.LoginHistory(data); err != nil {
 		t.Error(err)
 	}
 

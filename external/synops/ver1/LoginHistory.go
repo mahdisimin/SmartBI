@@ -1,4 +1,4 @@
-package external
+package ver1
 
 import (
 	"encoding/json"
@@ -6,6 +6,7 @@ import (
 	"intelligentBI/pkg"
 	"io"
 	"net/http"
+	"time"
 )
 
 type Synops struct {
@@ -13,10 +14,11 @@ type Synops struct {
 }
 
 type LoginHistoryResBodydata struct {
-	IpAddress string `json:"ip_address"`
-	Country   string `json:"country"`
-	UserAgent string `json:"user_agent"`
-	IsSuccess bool   `json:"is_success"`
+	IpAddress string    `json:"ip_address"`
+	Country   string    `json:"country"`
+	UserAgent string    `json:"user_agent"`
+	TimeStamp time.Time `json:"time_stamp"`
+	IsSuccess bool      `json:"is_success"`
 }
 
 type LoginHistoryResBody struct {

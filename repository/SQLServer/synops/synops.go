@@ -2,7 +2,7 @@ package SQLServer
 
 import (
 	"errors"
-	external "intelligentBI/external/synops"
+	external "intelligentBI/external/synops/ver1"
 	"intelligentBI/pkg"
 	"intelligentBI/repository/SQLServer"
 
@@ -20,12 +20,12 @@ type loginHistory struct {
 func (s Synops) Persistdata(data any) error {
 	switch s.resourseName {
 	case pkg.LoginHistory:
-		return s.LoginHostory(data)
+		return s.LoginHistory(data)
 	}
 	return nil
 }
 
-func (s Synops) LoginHostory(data any) error {
+func (s Synops) LoginHistory(data any) error {
 	var db *sqlx.DB
 	input, ok := data.(external.LoginHistoryRes)
 	if dbTemp, err := SQLServer.Connect(); err != nil {
