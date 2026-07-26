@@ -1,7 +1,7 @@
 package echowebframework
 
 import (
-	"intelligentBI/repository/SQLServer/user"
+	SQLServer "intelligentBI/repository/SQLServer/user"
 	"intelligentBI/service"
 	"log"
 	"net/http"
@@ -14,7 +14,7 @@ func UserRegisterHandler(c *echo.Context) error {
 	var userRegReq service.UserRegisterRequest
 	var userRegResp service.UserRegisterResponse
 	var userServ = service.UserService{
-		Repository: user.SqlServer{},
+		Repository: SQLServer.User{},
 	}
 
 	if err := c.Bind(&userRegReq); err != nil {
@@ -36,7 +36,7 @@ func UserLoginHandler(c *echo.Context) error {
 	var userLoginReq service.UserLoginRequest
 	var userLoginResp service.UserLoginResponse
 	var userServ = service.UserService{
-		Repository: user.SqlServer{},
+		Repository: SQLServer.User{},
 	}
 
 	if err := c.Bind(&userLoginReq); err != nil {
@@ -59,7 +59,7 @@ func UserProfileHandler(c *echo.Context) error {
 
 	var userProfileResp service.UserProfileResponse
 	var userServ = service.UserService{
-		Repository: user.SqlServer{},
+		Repository: SQLServer.User{},
 	}
 
 	userIdStr := c.Param("id")
