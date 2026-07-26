@@ -2,20 +2,19 @@ package SQLServer
 
 import (
 	"database/sql"
-	"fmt"
 	"intelligentBI/entity"
-	"net/url"
+	"intelligentBI/repository/SQLServer"
 
 	_ "github.com/denisenkom/go-mssqldb"
 	"github.com/jmoiron/sqlx"
 )
 
-type SqlServer struct {
+type user struct {
 }
 
-func (s SqlServer) IsPhoneNumberExists(phoneNumber string) (bool, error) {
+func (s user) IsPhoneNumberExists(phoneNumber string) (bool, error) {
 	var userID int64
-	db, err := connect()
+	db, err := SQLServer.Connect()
 	if err != nil {
 		return false, err
 	}
@@ -30,10 +29,10 @@ func (s SqlServer) IsPhoneNumberExists(phoneNumber string) (bool, error) {
 	return true, nil
 }
 
-func (s SqlServer) PersistUser(_userName, _phonNumber, _Password string) (int64, error) {
+func (s user) PersistUser(_userName, _phonNumber, _Password string) (int64, error) {
 	var userID int64
 	var db *sqlx.DB
-	if dbTemp, err := connect(); err != nil {
+	if dbTemp, err := SQLServer.Connect(); err != nil {
 		return 0, err
 	} else {
 		db = dbTemp
@@ -47,9 +46,9 @@ func (s SqlServer) PersistUser(_userName, _phonNumber, _Password string) (int64,
 	return userID, nil
 }
 
-func (s SqlServer) GetPasswordByPhoneNumber(phoneNumber string) (string, error) {
+func (s user) GetPasswordByPhoneNumber(phoneNumber string) (string, error) {
 	var password string
-	db, err := connect()
+	db, err := SQLServer.Connect()
 	if err != nil {
 		return "", err
 	}
@@ -64,9 +63,9 @@ func (s SqlServer) GetPasswordByPhoneNumber(phoneNumber string) (string, error) 
 	return password, nil
 }
 
-func (s SqlServer) GetUserIDByPhoneNumber(phoneNumber string) (int64, error) {
+func (s user) GetUserIDByPhoneNumber(phoneNumber string) (int64, error) {
 	var userId int64
-	db, err := connect()
+	db, err := SQLServer.Connect()
 	if err != nil {
 		return 0, err
 	}
@@ -81,10 +80,10 @@ func (s SqlServer) GetUserIDByPhoneNumber(phoneNumber string) (int64, error) {
 	return userId, nil
 }
 
-func (s SqlServer) GetUserByUserID(userID int64) (entity.User, error) {
+func (s user) GetUserByUserID(userID int64) (entity.User, error) {
 	var user entity.User
 	var userLinkList []entity.WebAppList
-	db, err := connect()
+	db, err := SQLServer.Connect()
 	if err != nil {
 		return user, err
 	}
@@ -107,11 +106,11 @@ func (s SqlServer) GetUserByUserID(userID int64) (entity.User, error) {
 	return user, nil
 }
 
-func (s SqlServer) GetUserLinkListByUserID(userID int64) ([]entity.WebAppList, error) {
+func (s user) GetUserLinkListByUserID(userID int64) ([]entity.WebAppList, error) {
 	var WebAppsTempDB []entity.WebAppListDB
 	var WebApps []entity.WebAppList
 
-	db, err := connect()
+	db, err := SQLServer.Connect()
 	if err != nil {
 		return WebApps, err
 	}
@@ -135,16 +134,4 @@ func (s SqlServer) GetUserLinkListByUserID(userID int64) ([]entity.WebAppList, e
 	}
 
 	return WebApps, nil
-}
-
-func connect() (*sqlx.DB, error) {
-	var sqlDB *sqlx.DB
-	pass := url.QueryEscape(password)
-	connString := fmt.Sprintf("sqlserver://%s:%s@%s?database=%s", userName, pass, uRL, database)
-	if dbtemp, err := sqlx.Open("mssql", connString); err != nil {
-		return nil, err
-	} else {
-		sqlDB = dbtemp
-	}
-	return sqlDB, nil
 }

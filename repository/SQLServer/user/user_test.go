@@ -7,7 +7,7 @@ import (
 
 func TestSqlServer_PersistUser(t *testing.T) {
 	userServ := &service.UserService{
-		Repository: SqlServer{},
+		Repository: user{},
 	}
 	Req := service.UserRegisterRequest{
 		UserName:    "TestUser",
@@ -22,7 +22,7 @@ func TestSqlServer_PersistUser(t *testing.T) {
 
 func TestSqlServer_Login(t *testing.T) {
 	userServ := &service.UserService{
-		Repository: SqlServer{},
+		Repository: user{},
 	}
 	req := service.UserLoginRequest{
 		PhoneNumber: "09201008700",
@@ -35,7 +35,7 @@ func TestSqlServer_Login(t *testing.T) {
 }
 
 func TestSqlServer_GetUserByUserID(t *testing.T) {
-	s := SqlServer{}
+	s := user{}
 	user, err := s.GetUserByUserID(2)
 	if err != nil {
 		t.Fatal(err)
@@ -44,7 +44,7 @@ func TestSqlServer_GetUserByUserID(t *testing.T) {
 }
 
 func TestSqlServer_GetUserLinkListByUserID(t *testing.T) {
-	s := SqlServer{}
+	s := user{}
 	Links, err := s.GetUserLinkListByUserID(2)
 	if err != nil {
 		t.Fatal(err)

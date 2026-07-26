@@ -3,7 +3,7 @@ package nethttp
 import (
 	"encoding/json"
 	"fmt"
-	"intelligentBI/repository/SQLServer"
+	"intelligentBI/repository/SQLServer/user"
 	"intelligentBI/service"
 	"io"
 	"log"
@@ -18,7 +18,7 @@ func UserRegisterHandler(w http.ResponseWriter, r *http.Request) {
 	var userRegResp service.UserRegisterResponse
 	var data = make([]byte, r.ContentLength)
 	var userServ = service.UserService{
-		Repository: SQLServer.SqlServer{},
+		Repository: user.SqlServer{},
 	}
 
 	if r.Method != http.MethodPost {
@@ -74,7 +74,7 @@ func UserLoginHandler(w http.ResponseWriter, r *http.Request) {
 	var userLoginResp service.UserLoginResponse
 	var data = make([]byte, r.ContentLength)
 	var userServ = service.UserService{
-		Repository: SQLServer.SqlServer{},
+		Repository: user.SqlServer{},
 	}
 	fmt.Println(r.Method)
 	if r.Method != http.MethodPost {
@@ -129,7 +129,7 @@ func UserProfileHandler(w http.ResponseWriter, r *http.Request) {
 	var userId int64
 	var userProfileResp service.UserProfileResponse
 	var userServ = service.UserService{
-		Repository: SQLServer.SqlServer{},
+		Repository: user.SqlServer{},
 	}
 	params := mux.Vars(r)
 
