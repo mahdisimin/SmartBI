@@ -1,0 +1,70 @@
+[
+  {
+    "actor": null,
+    "result": { "error": null, "status_code": 200, "duration_seconds": 0.012 },
+    "source": "server_backend",
+    "request": {
+      "body": null,
+      "country": "unknown",
+      "ip_address": "10.233.69.201",
+      "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+      "query_params": null
+    },
+    "activity": { "id": 1001, "name": "ViewDashboard", "path": "/dashboard", "method": "GET" },
+    "event_id": "b1a1c2d3-0001-4a11-9a11-000000000001",
+    "event_type": "user.activity",
+    "occurred_at": "2026-08-10T09:15:00.000000+00:00",
+    "schema_version": 1
+  },
+  {
+    "actor": null,
+    "result": { "error": null, "status_code": 200, "duration_seconds": 0.031 },
+    "source": "server_backend",
+    "request": {
+      "body": null,
+      "country": "unknown",
+      "ip_address": "10.233.69.202",
+      "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+      "query_params": null
+    },
+    "activity": { "id": 1002, "name": "ViewReport", "path": "/reports/42", "method": "GET" },
+    "event_id": "b1a1c2d3-0002-4a11-9a11-000000000002",
+    "event_type": "user.activity",
+    "occurred_at": "2026-07-15T14:42:10.000000+00:00",
+    "schema_version": 1
+  },
+  {
+    "actor": null,
+    "result": { "error": null, "status_code": 404, "duration_seconds": 0.004 },
+    "source": "server_backend",
+    "request": {
+      "body": null,
+      "country": "unknown",
+      "ip_address": "10.233.69.203",
+      "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+      "query_params": null
+    },
+    "activity": { "id": 1003, "name": "Unknown", "path": "/favicon.ico", "method": "GET" },
+    "event_id": "b1a1c2d3-0003-4a11-9a11-000000000003",
+    "event_type": "user.activity",
+    "occurred_at": "2026-05-01T08:00:00.000000+00:00",
+    "schema_version": 1
+  },
+  {
+    "actor": null,
+    "result": { "error": null, "status_code": 200, "duration_seconds": 0.019 },
+    "source": "server_backend",
+    "request": {
+      "body": null,
+      "country": "unknown",
+      "ip_address": "10.233.69.204",
+      "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+      "query_params": null
+    },
+    "activity": { "id": 1004, "name": "Login", "path": "/login", "method": "POST" },
+    "event_id": "b1a1c2d3-0004-4a11-9a11-000000000004",
+    "event_type": "user.activity",
+    "occurred_at": "2026-04-01T11:20:00.000000+00:00",
+    "schema_version": 1
+  }
+]

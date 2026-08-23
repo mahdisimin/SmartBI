@@ -1,0 +1,26 @@
+{
+  "actor": null,
+  "result": {
+    "error": null,
+    "status_code": 404,
+    "duration_seconds": 0.004066
+  },
+  "source": "server_backend",
+  "request": {
+    "body": null,
+    "country": "unknown",
+    "ip_address": "10.233.69.215",
+    "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+    "query_params": null
+  },
+  "activity": {
+    "id": 8607663,
+    "name": "Unknown",
+    "path": "/favicon.ico",
+    "method": "GET"
+  },
+  "event_id": "a544f4eb-41a0-4458-abba-7f3f35a31220",
+  "event_type": "user.activity",
+  "occurred_at": "2026-08-18T13:23:20.618967+00:00",
+  "schema_version": 1
+}

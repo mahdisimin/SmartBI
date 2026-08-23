@@ -25,6 +25,9 @@ func Router() error {
 	userGroup.POST("/login", echowebframework.UserLoginHandler)
 	userGroup.GET("/user_profile/:id", echowebframework.UserProfileHandler)
 
+	exportGroup := e.Group("/export")
+	exportGroup.GET("/:product", echowebframework.ExportHandler)
+
 	if err := e.Start(":8091"); err != nil {
 		return err
 	}

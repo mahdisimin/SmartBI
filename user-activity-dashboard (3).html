@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>اتاق پایش | داشبورد فعالیت کاربران سامانه سیناپس</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" crossorigin="anonymous"></script>
+<style>
+  :root{
+    --bg:#0B1220;
+    --panel:#121A2E;
+    --panel-2:#182242;
+    --border:#26314D;
+    --border-soft:#1E2A47;
+    --text:#E8EAF0;
+    --text-dim:#8892A8;
+    --text-faint:#5C6580;
+    --amber:#F5A623;
+    --amber-dim:#B98322;
+    --teal:#4EC9B0;
+    --coral:#E8604C;
+    --violet:#8B7CF6;
+    --radius:10px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{background:var(--bg); color:var(--text); font-family:'Vazirmatn',sans-serif;}
+  body{padding:0 0 60px 0; position:relative; overflow-x:hidden;}
+  .mono{font-family:'JetBrains Mono',monospace; direction:ltr; unicode-bidi:isolate;}
+
+  /* ---- signature: scanning sweep line ---- */
+  .sweep-track{position:fixed; top:0; left:0; right:0; height:2px; z-index:50; background:var(--border-soft); overflow:hidden;}
+  .sweep-track::after{
+    content:''; position:absolute; top:0; bottom:0; width:220px;
+    background:linear-gradient(90deg, transparent, var(--amber), transparent);
+    animation:sweep 5.5s linear infinite; opacity:.85;
+  }
+  @keyframes sweep{0%{transform:translateX(-260px);} 100%{transform:translateX(calc(100vw + 60px));}}
+  @keyframes fadeUp{ from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:translateY(0);} }
+  @keyframes shimmer{ 0%{background-position:-200px 0;} 100%{background-position:200px 0;} }
+  @media (prefers-reduced-motion: reduce){
+    .sweep-track::after{animation:none; display:none;}
+    .pulse-dot::before{animation:none;}
+    *{animation-duration:.001s !important; transition-duration:.001s !important;}
+  }
+
+  .wrap{max-width:1280px; margin:0 auto; padding:28px 24px 0;}
+
+  /* ---- topbar ---- */
+  .topbar{display:flex; align-items:center; justify-content:space-between; gap:16px; padding-bottom:20px; margin-bottom:14px; border-bottom:1px solid var(--border); flex-wrap:wrap;}
+  .brand{display:flex; align-items:baseline; gap:10px;}
+  .brand h1{font-size:19px; font-weight:700; letter-spacing:.2px;}
+  .brand .tag{font-size:11px; color:var(--text-faint); font-family:'JetBrains Mono',monospace; direction:ltr;}
+  .status-cluster{display:flex; align-items:center; gap:22px; flex-wrap:wrap;}
+  .status-item{display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text-dim);}
+  .pulse-dot{position:relative; width:8px; height:8px; border-radius:50%; background:var(--teal); flex:none;}
+  .pulse-dot::before{content:''; position:absolute; inset:-6px; border-radius:50%; border:1px solid var(--teal); animation:pulse 2.2s ease-out infinite;}
+  @keyframes pulse{0%{transform:scale(.4); opacity:.9;} 100%{transform:scale(2.1); opacity:0;}}
+  .upload-btn{background:var(--panel-2); border:1px solid var(--border); color:var(--text); padding:9px 16px; border-radius:8px; font-family:'Vazirmatn'; font-size:13px; cursor:pointer; display:flex; align-items:center; gap:8px; transition:.15s border-color, .15s transform;}
+  .upload-btn:hover{border-color:var(--amber); transform:translateY(-1px);}
+  #fileInput{display:none;}
+
+  /* ---- filter bar ---- */
+  .filter-bar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; min-height:20px; margin-bottom:26px;}
+  .filter-bar .hint{font-size:11.5px; color:var(--text-faint); display:flex; align-items:center; gap:6px;}
+  .filter-chip{
+    display:flex; align-items:center; gap:7px; background:rgba(245,166,35,.12); border:1px solid rgba(245,166,35,.4);
+    color:var(--amber); font-size:12px; padding:5px 8px 5px 12px; border-radius:20px;
+    animation:fadeUp .25s ease both;
+  }
+  .filter-chip .dim{color:var(--text-dim); font-size:10.5px;}
+  .filter-chip button{background:none; border:none; color:var(--amber); cursor:pointer; font-size:14px; line-height:1; padding:2px; border-radius:50%; display:flex;}
+  .filter-chip button:hover{background:rgba(245,166,35,.25);}
+  .clear-all{font-size:12px; color:var(--text-faint); background:none; border:1px dashed var(--border); border-radius:20px; padding:5px 12px; cursor:pointer; transition:.15s;}
+  .clear-all:hover{color:var(--coral); border-color:var(--coral);}
+
+  /* ---- section label ---- */
+  .sec-label{display:flex; align-items:center; gap:10px; margin:34px 0 14px;}
+  .sec-label .code{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--amber); background:rgba(245,166,35,.1); border:1px solid rgba(245,166,35,.3); padding:3px 8px; border-radius:5px; letter-spacing:.5px; direction:ltr;}
+  .sec-label h2{font-size:15px; font-weight:600; color:var(--text);}
+  .sec-label .sub{font-size:12px; color:var(--text-faint); margin-right:auto;}
+
+  /* ---- KPI cards ---- */
+  .kpi-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:14px;}
+  .kpi-card{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:18px 18px 15px; position:relative; overflow:hidden; animation:fadeUp .45s ease both; transition:transform .4s cubic-bezier(.34,1.56,.64,1), border-color .25s, box-shadow .3s;}
+  .kpi-card::before{content:''; position:absolute; top:0; right:0; left:0; height:2px; background:linear-gradient(90deg, var(--amber), transparent); opacity:.65;}
+  .kpi-card:hover{transform:translateY(-5px) rotate(-0.6deg) scale(1.02); border-color:var(--amber-dim); box-shadow:0 14px 28px -12px rgba(245,166,35,.3);}
+  .kpi-card .lbl{font-size:12px; font-weight:500; color:var(--text-dim); letter-spacing:.2px; margin-bottom:13px; line-height:1.5;}
+  .kpi-card .val{font-family:'JetBrains Mono',monospace; font-size:27px; font-weight:700; color:var(--text); direction:ltr; letter-spacing:-.3px; line-height:1;}
+  .kpi-card .val .unit{font-family:'Vazirmatn',sans-serif; font-size:12.5px; font-weight:500; color:var(--text-dim); margin-right:6px; letter-spacing:0;}
+  .kpi-card .delta{font-size:11.5px; color:var(--text-faint); margin-top:10px; padding-top:10px; border-top:1px solid var(--border-soft);}
+
+  /* ---- grid layouts ---- */
+  .grid-2-1{display:grid; grid-template-columns:2fr 1fr; gap:14px;}
+  .panel{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); padding:18px 18px 16px; animation:fadeUp .5s ease both;}
+  .panel h3{font-size:13.5px; font-weight:600; margin-bottom:4px; color:var(--text); display:flex; align-items:center; justify-content:space-between;}
+  .panel h3 .cnt{color:var(--text-faint); font-weight:400; font-size:12px;}
+  .panel .hint-sm{font-size:11px; color:var(--text-faint); margin-bottom:12px;}
+  canvas{max-width:100%;}
+
+  /* ---- time hierarchy controls ---- */
+  .trend-controls{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; flex-wrap:wrap;}
+  .breadcrumb{display:flex; align-items:center; gap:6px; font-size:12px; flex-wrap:wrap;}
+  .breadcrumb .crumb{color:var(--text-dim); cursor:pointer; padding:3px 7px; border-radius:5px; transition:.15s;}
+  .breadcrumb .crumb.clickable:hover{background:rgba(255,255,255,.06); color:var(--text);}
+  .breadcrumb .crumb.current{color:var(--amber); font-weight:600; cursor:default;}
+  .breadcrumb .crumb-sep{color:var(--text-faint); font-size:11px;}
+  .gran-toggle{display:flex; gap:3px; background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:3px;}
+  .gran-toggle button{background:none; border:none; color:var(--text-dim); font-family:'Vazirmatn'; font-size:12px; padding:5px 13px; border-radius:6px; cursor:pointer; transition:.15s;}
+  .gran-toggle button:hover{color:var(--text);}
+  .gran-toggle button.active{background:var(--amber); color:#1A1206; font-weight:600;}
+
+  /* ---- ranked list (feature usage) ---- */
+  .rank-list{display:flex; flex-direction:column; gap:10px;}
+  .rank-row{display:flex; align-items:center; gap:10px; font-size:12.5px; cursor:pointer; padding:4px 6px; margin:0 -6px; border-radius:6px; transition:.15s background;}
+  .rank-row:hover{background:rgba(255,255,255,.04);}
+  .rank-row.dimmed{opacity:.35;}
+  .rank-row.active{background:rgba(245,166,35,.1);}
+  .rank-row .name{flex:none; width:150px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .rank-row.active .name{color:var(--amber); font-weight:600;}
+  .rank-row .bar-bg{flex:1; height:8px; background:var(--panel-2); border-radius:4px; overflow:hidden;}
+  .rank-row .bar-fill{height:100%; background:linear-gradient(90deg, var(--amber-dim), var(--amber)); border-radius:4px; transition:width .5s cubic-bezier(.4,0,.2,1);}
+  .rank-row .num{flex:none; width:34px; text-align:left; font-family:'JetBrains Mono'; color:var(--text-dim); direction:ltr;}
+
+  /* ---- table ---- */
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  th{text-align:right; color:var(--text-faint); font-weight:500; font-size:11px; padding:6px 8px; border-bottom:1px solid var(--border); text-transform:uppercase; letter-spacing:.3px;}
+  td{padding:9px 8px; border-bottom:1px solid var(--border-soft); color:var(--text); transition:.15s background;}
+  td.mono, th.mono{font-family:'JetBrains Mono'; direction:ltr; text-align:left;}
+  tr{cursor:pointer;}
+  tr:hover td{background:rgba(255,255,255,.03);}
+  tr.active-row td{background:rgba(245,166,35,.08); border-bottom-color:rgba(245,166,35,.2);}
+  tr.dimmed-row td{opacity:.35;}
+  tr:last-child td{border-bottom:none;}
+  .pill{display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-family:'JetBrains Mono';}
+  .pill.owner{background:rgba(139,124,246,.15); color:var(--violet); border:1px solid rgba(139,124,246,.3);}
+  .bar-mini{width:60px; height:5px; background:var(--panel-2); border-radius:3px; display:inline-block; overflow:hidden; vertical-align:middle; margin-left:6px;}
+  .bar-mini i{display:block; height:100%; background:var(--teal); transition:width .5s;}
+
+  /* ---- verdict panel ---- */
+  .verdict{background:linear-gradient(160deg, var(--panel) 0%, var(--panel-2) 100%); border:1px solid var(--border); border-radius:var(--radius); padding:26px 26px 22px; animation:fadeUp .55s ease both;}
+  .verdict-head{display:flex; align-items:center; gap:12px; margin-bottom:16px;}
+  .verdict-head .score-badge{font-family:'JetBrains Mono'; font-size:22px; font-weight:700; color:var(--amber); background:rgba(245,166,35,.1); border:1px solid rgba(245,166,35,.35); border-radius:8px; padding:8px 14px; direction:ltr; transition:.3s;}
+  .verdict-head h3{font-size:16px; font-weight:700;}
+  .verdict-head p{font-size:12.5px; color:var(--text-dim); margin-top:3px;}
+  .verdict-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:6px;}
+  .vcard{background:rgba(255,255,255,.02); border:1px solid var(--border-soft); border-radius:8px; padding:14px; transition:transform .4s cubic-bezier(.34,1.56,.64,1), border-color .25s, box-shadow .3s;}
+  .vcard:hover{transform:translateY(-5px) rotate(-0.6deg) scale(1.02); border-color:var(--amber-dim); box-shadow:0 14px 28px -12px rgba(245,166,35,.3);}
+  .vcard .t{font-size:12.5px; font-weight:600; margin-bottom:6px; display:flex; align-items:center; gap:7px;}
+  .vcard .t .dot{width:7px; height:7px; border-radius:50%; flex:none; box-shadow:0 0 0 0 currentColor; animation:dotpulse 2s infinite;}
+  .vcard p{font-size:12px; color:var(--text-dim); line-height:1.9;}
+  .dot.ok{background:var(--teal); color:var(--teal);} .dot.warn{background:var(--amber); color:var(--amber);} .dot.bad{background:var(--coral); color:var(--coral);}
+  @keyframes dotpulse{0%{box-shadow:0 0 0 0 currentColor; opacity:1;} 70%{box-shadow:0 0 0 6px transparent; opacity:.3;} 100%{opacity:1;}}
+
+  .note{margin-top:26px; padding:14px 16px; border:1px dashed var(--border); border-radius:8px; font-size:12px; color:var(--text-faint); line-height:2; animation:fadeUp .6s ease both;}
+  .note b{color:var(--text-dim);}
+  .empty{padding:30px; text-align:center; color:var(--text-faint); font-size:12.5px;}
+
+  @media (max-width:900px){
+    .kpi-grid{grid-template-columns:repeat(2,1fr);}
+    .grid-2-1, .verdict-grid{grid-template-columns:1fr;}
+    .status-cluster{gap:12px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="sweep-track"></div>
+
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">
+      <h1>اتاق پایش فعالیت کاربران سامانه سیناپس</h1>
+      <span class="tag">USER-ACTIVITY-INTEL / v2 · cross-filter</span>
+    </div>
+    <div class="status-cluster">
+      <div class="status-item"><span class="pulse-dot"></span> منبع داده: <span id="srcLabel" class="mono">sample_data.csv</span></div>
+      <div class="status-item">بازه: <span id="rangeLabel" class="mono">—</span></div>
+      <label class="upload-btn" for="fileInput">↑ بارگذاری CSV کامل</label>
+      <input type="file" id="fileInput" accept=".csv">
+    </div>
+  </div>
+
+  <div class="filter-bar" id="filterBar"></div>
+
+  <div id="app"></div>
+</div>
+
+<script>
+const RAW_SAMPLE = [{"OccurredAt": "2026-08-18 13:23:20.618967 +00:00", "Actor": null, "ResultStatusCode": 404, "ResultDurationSeconds": 0.004066, "ResultError": null, "RequestBody": null, "ActivityName": "Unknown", "ActivityPath": "/favicon.ico", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-18 14:41:29.764431 +00:00", "Actor": null, "ResultStatusCode": 404, "ResultDurationSeconds": 0.00293, "ResultError": null, "RequestBody": null, "ActivityName": "Unknown", "ActivityPath": "/favicon.ico", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-19 08:07:08.589630 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.107681, "ResultError": null, "RequestBody": null, "ActivityName": "User_Account | Profile_Retrieve Profile_Update", "ActivityPath": "/api/v1/account/profile/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-19 08:07:08.831357 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.067631, "ResultError": null, "RequestBody": null, "ActivityName": "Notification | Statistical", "ActivityPath": "/api/v1/notification/statistical/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-19 08:07:08.887840 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.089889, "ResultError": null, "RequestBody": null, "ActivityName": "Query_Search | Create GetList", "ActivityPath": "/api/v1/queries/query-search/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-19 08:07:08.936188 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.063177, "ResultError": null, "RequestBody": "{\"platform\":\"twitter\"}", "ActivityName": "Word_Cloud_Cluster | Retrieve", "ActivityPath": "/api/v1/search/cluster/word_cloud/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:07:08.940621 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.069608, "ResultError": null, "RequestBody": "{\"platform\":\"twitter\"}", "ActivityName": "Word_Cloud_Cluster | Retrieve", "ActivityPath": "/api/v1/search/cluster/word_cloud/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:07:43.513896 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.036194, "ResultError": null, "RequestBody": null, "ActivityName": "Report360 | Create GetList", "ActivityPath": "/api/v1/report360/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-19 08:07:59.080948 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.032174, "ResultError": null, "RequestBody": "{\"platform\":\"twitter\"}", "ActivityName": "Word_Cloud_Cluster | Retrieve", "ActivityPath": "/api/v1/search/cluster/word_cloud/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:13:47.248413 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.023362, "ResultError": null, "RequestBody": null, "ActivityName": "User_Account | Profile_Retrieve Profile_Update", "ActivityPath": "/api/v1/account/profile/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-19 08:13:47.840726 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.015654, "ResultError": null, "RequestBody": null, "ActivityName": "Query_Search | Create GetList", "ActivityPath": "/api/v1/queries/query-search/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-19 08:13:47.869996 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.038126, "ResultError": null, "RequestBody": "{\"platform\":\"twitter\"}", "ActivityName": "Word_Cloud_Cluster | Retrieve", "ActivityPath": "/api/v1/search/cluster/word_cloud/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:13:47.872122 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.042033, "ResultError": null, "RequestBody": "{\"platform\":\"twitter\"}", "ActivityName": "Word_Cloud_Cluster | Retrieve", "ActivityPath": "/api/v1/search/cluster/word_cloud/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:13:48.764144 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.013735, "ResultError": null, "RequestBody": null, "ActivityName": "Notification | Statistical", "ActivityPath": "/api/v1/notification/statistical/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-19 08:14:01.586859 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.020314, "ResultError": null, "RequestBody": null, "ActivityName": "Comparison_Search | Create GetList", "ActivityPath": "/api/v1/queries/comparison-search/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-19 08:14:18.409488 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.0689, "ResultError": null, "RequestBody": null, "ActivityName": "Relationship_Graph | Create GetList", "ActivityPath": "/api/v1/graph/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-19 08:14:19.548194 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.018803, "ResultError": null, "RequestBody": null, "ActivityName": "Comparison_Search | Create GetList", "ActivityPath": "/api/v1/queries/comparison-search/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-19 08:14:21.201839 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.022698, "ResultError": null, "RequestBody": "{\"platform\":\"twitter\"}", "ActivityName": "Word_Cloud_Cluster | Retrieve", "ActivityPath": "/api/v1/search/cluster/word_cloud/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:14:49.168430 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.011942, "ResultError": null, "RequestBody": null, "ActivityName": "Report360 | Create GetList", "ActivityPath": "/api/v1/report360/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-19 08:14:57.159156 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.410721, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-19T08:13:46.681Z\",\"page\":1,\"platform\":\"news\",\"q\":\"پزشکیان\",\"report_type\":\"search_in_source\",\"rows\":10,\"start_date\":\"2026-05-21T08:13:46.681Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:14:57.513478 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.457693, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-19T08:13:46.681Z\",\"page\":1,\"platform\":\"telegram\",\"q\":\"پزشکیان\",\"report_type\":\"search_in_source\",\"rows\":10,\"start_date\":\"2026-05-21T08:13:46.681Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:14:58.803180 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 1.746824, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-19T08:13:46.681Z\",\"page\":1,\"platform\":\"twitter\",\"q\":\"پزشکیان\",\"report_type\":\"search_in_source\",\"rows\":10,\"start_date\":\"2026-05-21T08:13:46.681Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:14:59.043303 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 2.291754, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-19T08:13:46.681Z\",\"page\":1,\"platform\":\"instagram\",\"q\":\"پزشکیان\",\"report_type\":\"search_in_source\",\"rows\":10,\"start_date\":\"2026-05-21T08:13:46.681Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:15:01.869074 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.111957, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-19T08:13:46.681Z\",\"page\":1,\"platform\":\"telegram\",\"q\":\"pezeshkian_com\",\"report_type\":\"source_info\",\"rows\":10,\"start_date\":\"2026-05-21T08:13:46.681Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:15:02.729725 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.443285, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-19T08:15:01.693Z\",\"page\":1,\"platform\":\"telegram\",\"report_type\":\"search_in_source\",\"rows\":10,\"sources\":[\"2226446656\"],\"start_date\":\"2026-05-21T08:15:01.693Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:15:02.739574 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.443845, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-19T08:15:01.693Z\",\"order\":\"desc\",\"page\":1,\"platform\":\"telegram\",\"q\":\"*\",\"report_type\":\"growth\",\"rows\":10,\"sort\":\"date\",\"sources\":[\"pezeshkian_com\"],\"start_date\":\"2026-05-21T08:15:01.693Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:15:03.624276 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 1.491072, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-19T08:15:01.693Z\",\"page\":1,\"platform\":\"telegram\",\"report_type\":\"sentiments\",\"rows\":10,\"sources\":[\"2226446656\"],\"start_date\":\"2026-05-21T08:15:01.693Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:15:03.888555 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.726462, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-19T08:15:01.693Z\",\"page\":1,\"platform\":\"telegram\",\"report_type\":\"advertise\",\"rows\":10,\"sources\":[\"2226446656\"],\"start_date\":\"2026-05-21T08:15:01.693Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:15:04.065616 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 1.782851, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-19T08:15:01.693Z\",\"page\":1,\"platform\":\"telegram\",\"report_type\":\"categories\",\"rows\":10,\"sources\":[\"2226446656\"],\"start_date\":\"2026-05-21T08:15:01.693Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:15:04.239776 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 1.939147, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-19T08:15:01.693Z\",\"page\":1,\"platform\":\"telegram\",\"report_type\":\"posts\",\"rows\":12,\"sort\":\"date\",\"sources\":[\"2226446656\"],\"start_date\":\"2026-05-21T08:15:01.693Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:15:05.669550 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 400, "ResultDurationSeconds": 0.074671, "ResultError": null, "RequestBody": "{\"content\":{\"report_info\":{\"categories\":{\"chartData\":[{\"count\":506,\"key\":\"security_defense\"},{\"count\":355,\"key\":\"politic\"},{\"count\":172,\"key\":\"economic\"},{\"count\":70,\"key\":\"culture_art\"},{\"count\":25,\"key\":\"science_tech_health\"},{\"count\":12,\"key\":\"social\"},{\"count\":9,\"key\":\"religion\"},{\"count\":9,\"key\":\"sport\"},{\"count\":7,\"key\":\"dailylife\"}],\"total\":1165},\"content_type_distribution\":[{\"count\":490,\"key\":\"link_count\"},{\"count\":5,\"key\":\"file_count\"},{\"count\":9050,\"key\":\"video_count\"},{\"count\":8530,\"key\":\"photo_count\"}],\"growth\":[{\"datetime\":\"2026-08-18T15:00:39Z\",\"member_count\":1849956,\"timestamp\":1787065239000}],\"sentiments\":{\"chartData\":[{\"count\":743,\"key\":\"neutral\"},{\"count\":62,\"key\":\"positive\"},{\"count\":50,\"key\":\"negative\"}],\"total\":855}},\"report_platform\":\"telegram\",\"source_info\":{\"avatar\":\"\",\"bio\":\"پل ارتباطی با  مدیریت👇\\n\\n@Admiin_pezeskian\\n\\nآدرس اینستاگرام 👇\\n\\nhttps://www.instagram.com/pezeshkian_com\",\"channel_id\":\"2226446656\",\"channel_title\":\"حامیان پزشکیان\",\"channel_username\":\"pezeshkian_com\",\"file_count\":5,\"link_count\":490,\"member_count\":1864316,\"photo_count\":8530,\"type\":\"channel\",\"video_count\":9050}},\"description\":\"پل ارتباطی با  مدیریت👇\\n\\n@Admiin_pezeskian\\n\\nآدرس اینستاگرام 👇\\n\\nhttps://www.instagram.com/pezeshkian_com\",\"end_date\":\"2026-08-19T08:15:01.693Z\",\"image\":\"\",\"q\":\"حامیان پزشکیان\",\"report_type\":\"source\",\"start_date\":\"2026-05-21T08:15:01.693Z\",\"title\":\"حامیان پزشکیان\"}", "ActivityName": "Report360 | Create GetList", "ActivityPath": "/api/v1/report360/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:15:11.217361 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 8.931777, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-19T08:15:01.693Z\",\"page\":1,\"platform\":\"telegram\",\"report_type\":\"emotion\",\"rows\":10,\"sources\":[\"2226446656\"],\"start_date\":\"2026-05-21T08:15:01.693Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:15:11.512060 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 9.395659, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-19T08:15:01.693Z\",\"page\":1,\"platform\":\"telegram\",\"report_type\":\"process\",\"rows\":10,\"sources\":[\"2226446656\"],\"start_date\":\"2026-05-21T08:15:01.693Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:15:12.144179 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 9.389953, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-19T08:15:01.693Z\",\"page\":1,\"platform\":\"telegram\",\"report_type\":\"cloud\",\"rows\":25,\"sources\":[\"2226446656\"],\"start_date\":\"2026-05-21T08:15:01.693Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:15:13.132030 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 400, "ResultDurationSeconds": 0.045906, "ResultError": null, "RequestBody": "{\"content\":{\"report_info\":{\"categories\":{\"chartData\":[{\"count\":506,\"key\":\"security_defense\"},{\"count\":355,\"key\":\"politic\"},{\"count\":172,\"key\":\"economic\"},{\"count\":70,\"key\":\"culture_art\"},{\"count\":25,\"key\":\"science_tech_health\"},{\"count\":12,\"key\":\"social\"},{\"count\":9,\"key\":\"religion\"},{\"count\":9,\"key\":\"sport\"},{\"count\":7,\"key\":\"dailylife\"}],\"total\":1165},\"content_type_distribution\":[{\"count\":490,\"key\":\"link_count\"},{\"count\":5,\"key\":\"file_count\"},{\"count\":9050,\"key\":\"video_count\"},{\"count\":8530,\"key\":\"photo_count\"}],\"emotion\":{\"chartData\":[{\"count\":375,\"key\":\"neutral\"},{\"count\":219,\"key\":\"fear\"},{\"count\":161,\"key\":\"anger\"},{\"count\":128,\"key\":\"optimism\"},{\"count\":50,\"key\":\"trust\"},{\"count\":42,\"key\":\"disgust\"},{\"count\":34,\"key\":\"sadness\"},{\"count\":23,\"key\":\"joy\"},{\"count\":10,\"key\":\"surprise\"},{\"count\":2,\"key\":\"other\"}],\"total\":1044},\"frequent_entities\":{\"event\":[{\"count\":22,\"key\":\"انقلاب\"},{\"count\":8,\"key\":\"جنگ رمضان\"},{\"count\":5,\"key\":\"جام جهانی\"},{\"count\":5,\"key\":\"جنگ تحمیلی\"},{\"count\":4,\"key\":\"اربعین\"},{\"count\":4,\"key\":\"اربعین حسینی\"},{\"count\":4,\"key\":\"تحمیلی\"},{\"count\":4,\"key\":\"جنگ تحمیلی سوم\"},{\"count\":4,\"key\":\"حج\"},{\"count\":3,\"key\":\"برجام\"},{\"count\":3,\"key\":\"جنگ\"},{\"count\":3,\"key\":\"دفاع مقدس\"},{\"count\":2,\"key\":\"عملیات نصر 2\"},{\"count\":2,\"key\":\"فروردین\"},{\"count\":2,\"key\":\"قیام 15 خرداد\"},{\"count\":2,\"key\":\"پیمان ابراهیم\"},{\"count\":1,\"key\":\"28\"},{\"count\":1,\"key\":\"5\"},{\"count\":1,\"key\":\"8 سال\"},{\"count\":1,\"key\":\"NPT\"},{\"count\":1,\"key\":\"POA\"},{\"count\":1,\"key\":\"اباد\"},{\"count\":1,\"key\":\"اتش\"},{\"count\":1,\"key\":\"ارتش\"},{\"count\":1,\"key\":\"اردیبهشت\"}],\"location\":[{\"count\":419,\"key\":\"ایران\"},{\"count\":246,\"key\":\"امریکا\"},{\"count\":114,\"key\":\"تنگه هرمز\"},{\"count\":77,\"key\":\"تهران\"},{\"count\":59,\"key\":\"پاکستان\"},{\"count\":54,\"key\":\"جمهوری اسلامی ایران\"},{\"count\":49,\"key\":\"اسراییل\"},{\"count\":35,\"key\":\"لبنان\"},{\"count\":32,\"key\":\"واشنگتن\"},{\"count\":30,\"key\":\"ایالات متحده\"},{\"count\":29,\"key\":\"قطر\"},{\"count\":28,\"key\":\"رژیم صهیونیستی\"},{\"count\":28,\"key\":\"کویت\"},{\"count\":26,\"key\":\"عراق\"},{\"count\":25,\"key\":\"خلیج فارس\"},{\"count\":25,\"key\":\"عربستان\"},{\"count\":25,\"key\":\"عمان\"},{\"count\":24,\"key\":\"اردن\"},{\"count\":22,\"key\":\"بحرین\"},{\"count\":22,\"key\":\"بندرعباس\"},{\"count\":19,\"key\":\"قشم\"},{\"count\":13,\"key\":\"عربستان سعودی\"},{\"count\":12,\"key\":\"اسلام اباد\"},{\"count\":12,\"key\":\"چین\"},{\"count\":12,\"key\":\"یمن\"}],\"organ\":[{\"count\":37,\"key\":\"دولت\"},{\"count\":31,\"key\":\"سپاه\"},{\"count\":30,\"key\":\"ارتش\"},{\"count\":30,\"key\":\"مجلس\"},{\"count\":28,\"key\":\"الجزیره\"},{\"count\":25,\"key\":\"وزارت خارجه\"},{\"count\":24,\"key\":\"تسنیم\"},{\"count\":19,\"key\":\"ارتش پاکستان\"},{\"count\":18,\"key\":\"رویترز\"},{\"count\":16,\"key\":\"الحدث\"},{\"count\":16,\"key\":\"نیروهای مسلح\"},{\"count\":16,\"key\":\"نیروی دریایی سپاه\"},{\"count\":14,\"key\":\"روابط عمومی\"},{\"count\":14,\"key\":\"سپاه پاسداران\"},{\"count\":14,\"key\":\"فارس\"},{\"count\":11,\"key\":\"ارتش تروریستی امریکا\"},{\"count\":11,\"key\":\"سنتکام\"},{\"count\":11,\"key\":\"صداوسیما\"},{\"count\":10,\"key\":\"ارتش امریکا\"},{\"count\":10,\"key\":\"العربیه\"},{\"count\":10,\"key\":\"امریکا\"},{\"count\":10,\"key\":\"فاکس نیوز\"},{\"count\":9,\"key\":\"اکسیوس\"},{\"count\":9,\"key\":\"سپاه پاسداران انقلاب اسلامی\"},{\"count\":9,\"key\":\"نیروی هوافضای سپاه\"}],\"person\":[{\"count\":169,\"key\":\"ترامپ\"},{\"count\":71,\"key\":\"پزشکیان\"},{\"count\":43,\"key\":\"قالیباف\"},{\"count\":30,\"key\":\"عراقچی\"},{\"count\":26,\"key\":\"سید عباس عراقچی\"},{\"count\":22,\"key\":\"نتانیاهو\"},{\"count\":16,\"key\":\"دونالد ترامپ\"},{\"count\":13,\"key\":\"عارف\"},{\"count\":13,\"key\":\"عاصم منیر\"},{\"count\":12,\"key\":\"بقایی\"},{\"count\":12,\"key\":\"رهبر انقلاب\"},{\"count\":10,\"key\":\"روبیو\"},{\"count\":7,\"key\":\"دکتر پزشکیان\"},{\"count\":7,\"key\":\"محمدباقر قالیباف\"},{\"count\":6,\"key\":\"مارکو روبیو\"},{\"count\":6,\"key\":\"ویتکاف\"},{\"count\":5,\"key\":\"pezeshkian\"},{\"count\":5,\"key\":\"بنیامین نتانیاهو\"},{\"count\":5,\"key\":\"رهبر\"},{\"count\":5,\"key\":\"رهبر معظم\"},{\"count\":5,\"key\":\"شهباز شریف\"},{\"count\":5,\"key\":\"غریب ابادی\"},{\"count\":5,\"key\":\"محسن رضایی\"},{\"count\":5,\"key\":\"نورالدین الدغیر\"},{\"count\":4,\"key\":\"اسکندر مومنی\"}]},\"growth\":[{\"datetime\":\"2026-08-18T15:00:39Z\",\"member_count\":1849956,\"timestamp\":1787065239000}],\"process\":[{\"count\":64,\"datetime\":\"2026-05-21T00:00:00.000+03:30\",\"timestamp\":1779309000000},{\"count\":83,\"datetime\":\"2026-05-22T00:00:00.000+03:30\",\"timestamp\":1779395400000},{\"count\":103,\"datetime\":\"2026-05-23T00:00:00.000+03:30\",\"timestamp\":1779481800000},{\"count\":68,\"datetime\":\"2026-05-24T00:00:00.000+03:30\",\"timestamp\":1779568200000},{\"count\":82,\"datetime\":\"2026-05-25T00:00:00.000+03:30\",\"timestamp\":1779654600000},{\"count\":104,\"datetime\":\"2026-05-26T00:00:00.000+03:30\",\"timestamp\":1779741000000},{\"count\":62,\"datetime\":\"2026-05-27T00:00:00.000+03:30\",\"timestamp\":1779827400000},{\"count\":78,\"datetime\":\"2026-05-28T00:00:00.000+03:30\",\"timestamp\":1779913800000},{\"count\":63,\"datetime\":\"2026-05-29T00:00:00.000+03:30\",\"timestamp\":1780000200000},{\"count\":58,\"datetime\":\"2026-05-30T00:00:00.000+03:30\",\"timestamp\":1780086600000},{\"count\":106,\"datetime\":\"2026-05-31T00:00:00.000+03:30\",\"timestamp\":1780173000000},{\"count\":87,\"datetime\":\"2026-06-01T00:00:00.000+03:30\",\"timestamp\":1780259400000},{\"count\":59,\"datetime\":\"2026-06-02T00:00:00.000+03:30\",\"timestamp\":1780345800000},{\"count\":90,\"datetime\":\"2026-06-03T00:00:00.000+03:30\",\"timestamp\":1780432200000},{\"count\":77,\"datetime\":\"2026-06-04T00:00:00.000+03:30\",\"timestamp\":1780518600000},{\"count\":53,\"datetime\":\"2026-06-05T00:00:00.000+03:30\",\"timestamp\":1780605000000},{\"count\":65,\"datetime\":\"2026-06-06T00:00:00.000+03:30\",\"timestamp\":1780691400000},{\"count\":112,\"datetime\":\"2026-06-07T00:00:00.000+03:30\",\"timestamp\":1780777800000},{\"count\":184,\"datetime\":\"2026-06-08T00:00:00.000+03:30\",\"timestamp\":1780864200000},{\"count\":72,\"datetime\":\"2026-06-09T00:00:00.000+03:30\",\"timestamp\":1780950600000},{\"count\":97,\"datetime\":\"2026-06-10T00:00:00.000+03:30\",\"timestamp\":1781037000000},{\"count\":95,\"datetime\":\"2026-06-11T00:00:00.000+03:30\",\"timestamp\":1781123400000},{\"count\":112,\"datetime\":\"2026-06-12T00:00:00.000+03:30\",\"timestamp\":1781209800000},{\"count\":59,\"datetime\":\"2026-06-13T00:00:00.000+03:30\",\"timestamp\":1781296200000},{\"count\":85,\"datetime\":\"2026-06-14T00:00:00.000+03:30\",\"timestamp\":1781382600000},{\"count\":124,\"datetime\":\"2026-06-15T00:00:00.000+03:30\",\"timestamp\":1781469000000},{\"count\":82,\"datetime\":\"2026-06-16T00:00:00.000+03:30\",\"timestamp\":1781555400000},{\"count\":97,\"datetime\":\"2026-06-17T00:00:00.000+03:30\",\"timestamp\":1781641800000},{\"count\":77,\"datetime\":\"2026-06-18T00:00:00.000+03:30\",\"timestamp\":1781728200000},{\"count\":69,\"datetime\":\"2026-06-19T00:00:00.000+03:30\",\"timestamp\":1781814600000},{\"count\":67,\"datetime\":\"2026-06-20T00:00:00.000+03:30\",\"timestamp\":1781901000000},{\"count\":117,\"datetime\":\"2026-06-21T00:00:00.000+03:30\",\"timestamp\":1781987400000},{\"count\":90,\"datetime\":\"2026-06-22T00:00:00.000+03:30\",\"timestamp\":1782073800000},{\"count\":79,\"datetime\":\"2026-06-23T00:00:00.000+03:30\",\"timestamp\":1782160200000},{\"count\":61,\"datetime\":\"2026-06-24T00:00:00.000+03:30\",\"timestamp\":1782246600000},{\"count\":93,\"datetime\":\"2026-06-25T00:00:00.000+03:30\",\"timestamp\":1782333000000},{\"count\":65,\"datetime\":\"2026-06-26T00:00:00.000+03:30\",\"timestamp\":1782419400000},{\"count\":90,\"datetime\":\"2026-06-27T00:00:00.000+03:30\",\"timestamp\":1782505800000},{\"count\":144,\"datetime\":\"2026-06-28T00:00:00.000+03:30\",\"timestamp\":1782592200000},{\"count\":148,\"datetime\":\"2026-06-29T00:00:00.000+03:30\",\"timestamp\":1782678600000},{\"count\":118,\"datetime\":\"2026-06-30T00:00:00.000+03:30\",\"timestamp\":1782765000000},{\"count\":112,\"datetime\":\"2026-07-01T00:00:00.000+03:30\",\"timestamp\":1782851400000},{\"count\":64,\"datetime\":\"2026-07-02T00:00:00.000+03:30\",\"timestamp\":1782937800000},{\"count\":216,\"datetime\":\"2026-07-03T00:00:00.000+03:30\",\"timestamp\":1783024200000},{\"count\":148,\"datetime\":\"2026-07-04T00:00:00.000+03:30\",\"timestamp\":1783110600000},{\"count\":86,\"datetime\":\"2026-07-05T00:00:00.000+03:30\",\"timestamp\":1783197000000},{\"count\":114,\"datetime\":\"2026-07-06T00:00:00.000+03:30\",\"timestamp\":1783283400000},{\"count\":128,\"datetime\":\"2026-07-07T00:00:00.000+03:30\",\"timestamp\":1783369800000},{\"count\":219,\"datetime\":\"2026-07-08T00:00:00.000+03:30\",\"timestamp\":1783456200000},{\"count\":187,\"datetime\":\"2026-07-09T00:00:00.000+03:30\",\"timestamp\":1783542600000},{\"count\":95,\"datetime\":\"2026-07-10T00:00:00.000+03:30\",\"timestamp\":1783629000000},{\"count\":88,\"datetime\":\"2026-07-11T00:00:00.000+03:30\",\"timestamp\":1783715400000},{\"count\":173,\"datetime\":\"2026-07-12T00:00:00.000+03:30\",\"timestamp\":1783801800000},{\"count\":197,\"datetime\":\"2026-07-13T00:00:00.000+03:30\",\"timestamp\":1783888200000},{\"count\":196,\"datetime\":\"2026-07-14T00:00:00.000+03:30\",\"timestamp\":1783974600000},{\"count\":184,\"datetime\":\"2026-07-15T00:00:00.000+03:30\",\"timestamp\":1784061000000},{\"count\":134,\"datetime\":\"2026-07-16T00:00:00.000+03:30\",\"timestamp\":1784147400000},{\"count\":211,\"datetime\":\"2026-07-17T00:00:00.000+03:30\",\"timestamp\":1784233800000},{\"count\":210,\"datetime\":\"2026-07-18T00:00:00.000+03:30\",\"timestamp\":1784320200000},{\"count\":137,\"datetime\":\"2026-07-19T00:00:00.000+03:30\",\"timestamp\":1784406600000},{\"count\":170,\"datetime\":\"2026-07-20T00:00:00.000+03:30\",\"timestamp\":1784493000000},{\"count\":175,\"datetime\":\"2026-07-21T00:00:00.000+03:30\",\"timestamp\":1784579400000},{\"count\":155,\"datetime\":\"2026-07-22T00:00:00.000+03:30\",\"timestamp\":1784665800000},{\"count\":199,\"datetime\":\"2026-07-23T00:00:00.000+03:30\",\"timestamp\":1784752200000},{\"count\":148,\"datetime\":\"2026-07-24T00:00:00.000+03:30\",\"timestamp\":1784838600000},{\"count\":120,\"datetime\":\"2026-07-25T00:00:00.000+03:30\",\"timestamp\":1784925000000},{\"count\":93,\"datetime\":\"2026-07-26T00:00:00.000+03:30\",\"timestamp\":1785011400000},{\"count\":83,\"datetime\":\"2026-07-27T00:00:00.000+03:30\",\"timestamp\":1785097800000},{\"count\":70,\"datetime\":\"2026-07-28T00:00:00.000+03:30\",\"timestamp\":1785184200000},{\"count\":77,\"datetime\":\"2026-07-29T00:00:00.000+03:30\",\"timestamp\":1785270600000},{\"count\":52,\"datetime\":\"2026-07-30T00:00:00.000+03:30\",\"timestamp\":1785357000000},{\"count\":41,\"datetime\":\"2026-07-31T00:00:00.000+03:30\",\"timestamp\":1785443400000},{\"count\":44,\"datetime\":\"2026-08-01T00:00:00.000+03:30\",\"timestamp\":1785529800000},{\"count\":45,\"datetime\":\"2026-08-02T00:00:00.000+03:30\",\"timestamp\":1785616200000},{\"count\":47,\"datetime\":\"2026-08-03T00:00:00.000+03:30\",\"timestamp\":1785702600000},{\"count\":47,\"datetime\":\"2026-08-04T00:00:00.000+03:30\",\"timestamp\":1785789000000},{\"count\":65,\"datetime\":\"2026-08-05T00:00:00.000+03:30\",\"timestamp\":1785875400000},{\"count\":63,\"datetime\":\"2026-08-06T00:00:00.000+03:30\",\"timestamp\":1785961800000},{\"count\":57,\"datetime\":\"2026-08-07T00:00:00.000+03:30\",\"timestamp\":1786048200000},{\"count\":51,\"datetime\":\"2026-08-08T00:00:00.000+03:30\",\"timestamp\":1786134600000},{\"count\":58,\"datetime\":\"2026-08-09T00:00:00.000+03:30\",\"timestamp\":1786221000000},{\"count\":62,\"datetime\":\"2026-08-10T00:00:00.000+03:30\",\"timestamp\":1786307400000},{\"count\":62,\"datetime\":\"2026-08-11T00:00:00.000+03:30\",\"timestamp\":1786393800000},{\"count\":37,\"datetime\":\"2026-08-12T00:00:00.000+03:30\",\"timestamp\":1786480200000},{\"count\":35,\"datetime\":\"2026-08-13T00:00:00.000+03:30\",\"timestamp\":1786566600000},{\"count\":44,\"datetime\":\"2026-08-14T00:00:00.000+03:30\",\"timestamp\":1786653000000},{\"count\":44,\"datetime\":\"2026-08-15T00:00:00.000+03:30\",\"timestamp\":1786739400000},{\"count\":45,\"datetime\":\"2026-08-16T00:00:00.000+03:30\",\"timestamp\":1786825800000},{\"count\":51,\"datetime\":\"2026-08-17T00:00:00.000+03:30\",\"timestamp\":1786912200000},{\"count\":35,\"datetime\":\"2026-08-18T00:00:00.000+03:30\",\"timestamp\":1786998600000},{\"count\":0,\"datetime\":\"2026-08-19T00:00:00.000+03:30\",\"timestamp\":1787085000000}],\"sentiments\":{\"chartData\":[{\"count\":743,\"key\":\"neutral\"},{\"count\":62,\"key\":\"positive\"},{\"count\":50,\"key\":\"negative\"}],\"total\":855}},\"report_platform\":\"telegram\",\"source_info\":{\"avatar\":\"\",\"bio\":\"پل ارتباطی با  مدیریت👇\\n\\n@Admiin_pezeskian\\n\\nآدرس اینستاگرام 👇\\n\\nhttps://www.instagram.com/pezeshkian_com\",\"channel_id\":\"2226446656\",\"channel_title\":\"حامیان پزشکیان\",\"channel_username\":\"pezeshkian_com\",\"file_count\":5,\"link_count\":490,\"member_count\":1864316,\"photo_count\":8530,\"type\":\"channel\",\"video_count\":9050}},\"description\":\"پل ارتباطی با  مدیریت👇\\n\\n@Admiin_pezeskian\\n\\nآدرس اینستاگرام 👇\\n\\nhttps://www.instagram.com/pezeshkian_com\",\"end_date\":\"2026-08-19T08:15:01.693Z\",\"image\":\"\",\"q\":\"حامیان پزشکیان\",\"report_type\":\"source\",\"start_date\":\"2026-05-21T08:15:01.693Z\",\"title\":\"حامیان پزشکیان\"}", "ActivityName": "Report360 | Create GetList", "ActivityPath": "/api/v1/report360/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:15:17.262506 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 14.505995, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-19T08:15:01.693Z\",\"page\":1,\"platform\":\"telegram\",\"report_type\":\"cloud\",\"rows\":20,\"sources\":[\"2226446656\"],\"start_date\":\"2026-05-21T08:15:01.693Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:15:22.916210 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.079995, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-19T08:15:22.779Z\",\"platform\":\"twitter\",\"report_type\":\"trends\",\"start_date\":\"2026-08-19T08:15:22.779Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:15:23.843864 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.012446, "ResultError": null, "RequestBody": null, "ActivityName": "Comparison_Search | Create GetList", "ActivityPath": "/api/v1/queries/comparison-search/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-19 08:15:25.117852 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.197061, "ResultError": null, "RequestBody": null, "ActivityName": "Bulletin | Create GetList", "ActivityPath": "/api/v1/bulletin/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-19 08:15:30.176393 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.206226, "ResultError": null, "RequestBody": null, "ActivityName": "Bulletin | Retrieve Update Destroy", "ActivityPath": "/api/v1/bulletin/938/", "ActivityMethod": "DELETE"}, {"OccurredAt": "2026-08-19 08:15:30.311086 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.031382, "ResultError": null, "RequestBody": null, "ActivityName": "Bulletin | Create GetList", "ActivityPath": "/api/v1/bulletin/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-19 08:16:28.210366 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.021687, "ResultError": null, "RequestBody": null, "ActivityName": "Query_Search | Create GetList", "ActivityPath": "/api/v1/queries/query-search/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-19 08:16:42.141678 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 201, "ResultDurationSeconds": 0.077296, "ResultError": null, "RequestBody": "{\"channel_id\":\"\",\"description\":\"\",\"messenger\":\"\",\"platform\":{\"twitter\":{\"categories\":[],\"contain_copy\":[],\"gender\":[],\"languages\":[\"fa\"],\"sentiment\":[]}},\"q\":\"پزشکیان\",\"title\":\"jsjs\"}", "ActivityName": "Query_Search | Create GetList", "ActivityPath": "/api/v1/queries/query-search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-19 08:16:42.292513 +00:00", "Actor": "{\"id\":51,\"organization_id\":39,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"0154a6f6-0e6c-52c4-b709-95aaead8423e\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.020823, "ResultError": null, "RequestBody": null, "ActivityName": "Query_Search | Create GetList", "ActivityPath": "/api/v1/queries/query-search/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-19 08:24:22.797795 +00:00", "Actor": "{\"id\":43,\"organization_id\":41,\"organization_role\":\"owner\",\"role\":3,\"uuid\":\"45fae334-63fa-5064-9e45-024ff9e0095c\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.038785, "ResultError": null, "RequestBody": null, "ActivityName": "User_Account | Profile_Retrieve Profile_Update", "ActivityPath": "/api/v1/account/profile/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-19 08:24:23.903451 +00:00", "Actor": "{\"id\":43,\"organization_id\":41,\"organization_role\":\"owner\",\"role\":3,\"uuid\":\"45fae334-63fa-5064-9e45-024ff9e0095c\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.012001, "ResultError": null, "RequestBody": null, "ActivityName": "Notification | Statistical", "ActivityPath": "/api/v1/notification/statistical/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-22 05:20:14.550929 +00:00", "Actor": "{\"id\":43,\"organization_id\":41,\"organization_role\":\"owner\",\"role\":3,\"uuid\":\"45fae334-63fa-5064-9e45-024ff9e0095c\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.025591, "ResultError": null, "RequestBody": null, "ActivityName": "User_Account | Profile_Retrieve Profile_Update", "ActivityPath": "/api/v1/account/profile/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-22 05:20:16.276384 +00:00", "Actor": "{\"id\":43,\"organization_id\":41,\"organization_role\":\"owner\",\"role\":3,\"uuid\":\"45fae334-63fa-5064-9e45-024ff9e0095c\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.011878, "ResultError": null, "RequestBody": null, "ActivityName": "Notification | Statistical", "ActivityPath": "/api/v1/notification/statistical/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-22 07:59:59.608102 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.038362, "ResultError": null, "RequestBody": null, "ActivityName": "User_Account | Profile_Retrieve Profile_Update", "ActivityPath": "/api/v1/account/profile/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-22 08:00:00.024770 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.029197, "ResultError": null, "RequestBody": null, "ActivityName": "Notification | Statistical", "ActivityPath": "/api/v1/notification/statistical/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-22 08:00:00.056116 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.067827, "ResultError": null, "RequestBody": null, "ActivityName": "Query_Search | Create GetList", "ActivityPath": "/api/v1/queries/query-search/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-22 08:00:03.764584 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.135208, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T08:00:00.760Z\",\"page\":1,\"platform\":\"all\",\"q\":\"ایر\",\"report_type\":\"search_suggest\",\"rows\":10,\"start_date\":\"2026-08-21T08:00:00.760Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:00:03.939675 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.085274, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T08:00:00.760Z\",\"page\":1,\"platform\":\"all\",\"q\":\"ایرا\",\"report_type\":\"search_suggest\",\"rows\":10,\"start_date\":\"2026-08-21T08:00:00.760Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:00:04.229372 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.081748, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T08:00:00.760Z\",\"page\":1,\"platform\":\"all\",\"q\":\"ایران\",\"report_type\":\"search_suggest\",\"rows\":10,\"start_date\":\"2026-08-21T08:00:00.760Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:00:05.985665 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.117988, "ResultError": null, "RequestBody": "{\"adv\":[],\"categories\":[],\"end_date\":\"2026-08-22T08:00:00.760Z\",\"gender\":[],\"hashtags\":[],\"keywords\":[],\"languages\":[],\"offensive\":[],\"order\":\"desc\",\"page\":1,\"platform\":\"twitter\",\"q\":\"ایران\",\"report_type\":\"advance\",\"rows\":10,\"sentiment\":[],\"sort\":\"date\",\"sources\":[],\"start_date\":\"2026-08-21T08:00:00.760Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:00:22.566761 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.106172, "ResultError": null, "RequestBody": "{\"adv\":[],\"categories\":[],\"end_date\":\"2026-08-22T08:00:00.760Z\",\"gender\":[],\"hashtags\":[],\"keywords\":[],\"languages\":[],\"offensive\":[],\"order\":\"desc\",\"page\":1,\"platform\":\"twitter\",\"q\":\"ایران\",\"report_type\":\"advance\",\"rows\":10,\"sentiment\":[],\"sort\":\"view\",\"sources\":[],\"start_date\":\"2026-08-21T08:00:00.760Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:00:53.319511 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.27157, "ResultError": null, "RequestBody": "{\"adv\":[],\"categories\":[],\"end_date\":\"2026-08-22T08:00:00.760Z\",\"gender\":[],\"hashtags\":[],\"keywords\":[],\"languages\":[\"fa\"],\"offensive\":[],\"order\":\"desc\",\"page\":1,\"platform\":\"twitter\",\"q\":\"ایران\",\"report_type\":\"advance\",\"rows\":10,\"sentiment\":[],\"sort\":\"view\",\"sources\":[],\"start_date\":\"2026-08-21T08:00:00.760Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:02:11.957071 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.118913, "ResultError": null, "RequestBody": null, "ActivityName": "Report360 | Create GetList", "ActivityPath": "/api/v1/report360/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-22 08:02:17.459915 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.228257, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T07:59:59.788Z\",\"page\":1,\"platform\":\"news\",\"q\":\"PahlaviComms\",\"report_type\":\"search_in_source\",\"rows\":10,\"start_date\":\"2026-05-24T07:59:59.788Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:02:17.501418 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.264337, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T07:59:59.788Z\",\"page\":1,\"platform\":\"telegram\",\"q\":\"PahlaviComms\",\"report_type\":\"search_in_source\",\"rows\":10,\"start_date\":\"2026-05-24T07:59:59.788Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:02:18.709268 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 1.482184, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T07:59:59.788Z\",\"page\":1,\"platform\":\"instagram\",\"q\":\"PahlaviComms\",\"report_type\":\"search_in_source\",\"rows\":10,\"start_date\":\"2026-05-24T07:59:59.788Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:02:19.375430 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 2.143242, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T07:59:59.788Z\",\"page\":1,\"platform\":\"twitter\",\"q\":\"PahlaviComms\",\"report_type\":\"search_in_source\",\"rows\":10,\"start_date\":\"2026-05-24T07:59:59.788Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:02:23.583285 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.110374, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T07:59:59.788Z\",\"page\":1,\"platform\":\"twitter\",\"q\":\"PahlaviComms\",\"report_type\":\"source_info\",\"rows\":10,\"start_date\":\"2026-05-24T07:59:59.788Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:02:24.675659 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.81363, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T08:02:24.272Z\",\"order\":\"desc\",\"page\":1,\"platform\":\"twitter\",\"q\":\"*\",\"report_type\":\"growth\",\"rows\":10,\"sort\":\"date\",\"sources\":[\"1740908213871214592\"],\"start_date\":\"2026-05-24T08:02:24.272Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:02:24.990359 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 1.122625, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T08:02:24.272Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"sentiments\",\"rows\":10,\"sources\":[\"1740908213871214592\"],\"start_date\":\"2026-05-24T08:02:24.272Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:02:24.991305 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 1.184342, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T08:02:24.272Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"emotion\",\"rows\":10,\"sources\":[\"1740908213871214592\"],\"start_date\":\"2026-05-24T08:02:24.272Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:02:26.152051 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 2.345151, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T08:02:24.272Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"categories\",\"rows\":10,\"sources\":[\"1740908213871214592\"],\"start_date\":\"2026-05-24T08:02:24.272Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:02:26.204304 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 1.954292, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T08:02:24.272Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"posts\",\"rows\":12,\"sort\":\"date\",\"sources\":[\"1740908213871214592\"],\"start_date\":\"2026-05-24T08:02:24.272Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:02:29.151848 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 4.908748, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T08:02:24.272Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"cloud\",\"rows\":25,\"sources\":[\"1740908213871214592\"],\"start_date\":\"2026-05-24T08:02:24.272Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:02:31.159353 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 7.346812, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T08:02:24.272Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"process\",\"rows\":10,\"sources\":[\"1740908213871214592\"],\"start_date\":\"2026-05-24T08:02:24.272Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:02:31.160745 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 7.205035, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T08:02:24.272Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"content_type_distribution\",\"rows\":10,\"sources\":[\"1740908213871214592\"],\"start_date\":\"2026-05-24T08:02:24.272Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:02:32.296321 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 8.425859, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T08:02:24.272Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"influence_graph\",\"rows\":20,\"sources\":[\"PahlaviComms\"],\"start_date\":\"2026-05-24T08:02:24.272Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:02:33.848650 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 9.603895, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T08:02:24.272Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"cloud\",\"rows\":20,\"sources\":[\"1740908213871214592\"],\"start_date\":\"2026-05-24T08:02:24.272Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:02:41.290271 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 500, "ResultDurationSeconds": 17.332734, "ResultError": "\"\\\"Got KeyError when attempting to get a value for field `location` on serializer `TwitterUserUnifier`.\\\\nThe serializer field might be named incorrectly and not match any attribute or key on the `dict` instance.\\\\nOriginal exception text was: 'location'.\\\"\"", "RequestBody": "{\"end_date\":\"2026-08-22T08:02:24.272Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"impact_graph\",\"rows\":20,\"sources\":[\"PahlaviComms\"],\"start_date\":\"2026-05-24T08:02:24.272Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:40:08.157900 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.077603, "ResultError": null, "RequestBody": null, "ActivityName": "NewsPaper | GetTop", "ActivityPath": "/api/v1/newspaper/top/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-22 08:40:08.501426 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.428763, "ResultError": null, "RequestBody": null, "ActivityName": "NewsPaper | GetList", "ActivityPath": "/api/v1/newspaper/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-22 08:40:17.511876 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.094541, "ResultError": null, "RequestBody": null, "ActivityName": "Opinion | Create GetList", "ActivityPath": "/api/v1/opinion/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-22 08:40:23.299609 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.159341, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T08:40:23.936Z\",\"platform\":\"twitter\",\"report_type\":\"trends\",\"start_date\":\"2026-08-22T08:40:23.936Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:40:27.655957 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.070882, "ResultError": null, "RequestBody": "{\"platform\":\"twitter\"}", "ActivityName": "Word_Cloud_Cluster | Retrieve", "ActivityPath": "/api/v1/search/cluster/word_cloud/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 08:40:27.702151 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.11677, "ResultError": null, "RequestBody": null, "ActivityName": "Query_Search | Create GetList", "ActivityPath": "/api/v1/queries/query-search/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-22 08:40:27.701157 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.108239, "ResultError": null, "RequestBody": "{\"platform\":\"twitter\"}", "ActivityName": "Word_Cloud_Cluster | Retrieve", "ActivityPath": "/api/v1/search/cluster/word_cloud/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 09:29:42.017686 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.104363, "ResultError": null, "RequestBody": null, "ActivityName": "Query_Search | Create GetList", "ActivityPath": "/api/v1/queries/query-search/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-22 11:32:50.062417 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.028781, "ResultError": null, "RequestBody": null, "ActivityName": "User_Account | Profile_Retrieve Profile_Update", "ActivityPath": "/api/v1/account/profile/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-22 11:32:50.598610 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.090763, "ResultError": null, "RequestBody": null, "ActivityName": "Query_Search | Create GetList", "ActivityPath": "/api/v1/queries/query-search/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-22 11:32:50.645300 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.022815, "ResultError": null, "RequestBody": null, "ActivityName": "Notification | Statistical", "ActivityPath": "/api/v1/notification/statistical/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-22 11:32:52.223300 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.074076, "ResultError": null, "RequestBody": null, "ActivityName": "Report360 | Create GetList", "ActivityPath": "/api/v1/report360/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-22 11:33:01.399971 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.104595, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:32:50.698Z\",\"page\":1,\"platform\":\"news\",\"q\":\"pezesh\",\"report_type\":\"search_in_source\",\"rows\":10,\"start_date\":\"2026-05-24T11:32:50.698Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:01.661727 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.254171, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:32:50.698Z\",\"page\":1,\"platform\":\"telegram\",\"q\":\"pezesh\",\"report_type\":\"search_in_source\",\"rows\":10,\"start_date\":\"2026-05-24T11:32:50.698Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:04.670783 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 3.249106, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:32:50.698Z\",\"page\":1,\"platform\":\"instagram\",\"q\":\"pezesh\",\"report_type\":\"search_in_source\",\"rows\":10,\"start_date\":\"2026-05-24T11:32:50.698Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:05.792603 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 4.383411, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:32:50.698Z\",\"page\":1,\"platform\":\"twitter\",\"q\":\"pezesh\",\"report_type\":\"search_in_source\",\"rows\":10,\"start_date\":\"2026-05-24T11:32:50.698Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:12.437315 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.449902, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:32:50.698Z\",\"page\":1,\"platform\":\"twitter\",\"q\":\"drpezeshkian\",\"report_type\":\"source_info\",\"rows\":10,\"start_date\":\"2026-05-24T11:32:50.698Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:13.416345 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.735786, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:12.825Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"process\",\"rows\":10,\"sources\":[\"3313128290\"],\"start_date\":\"2026-05-24T11:33:12.825Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:13.411824 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.717589, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:12.825Z\",\"order\":\"desc\",\"page\":1,\"platform\":\"twitter\",\"q\":\"*\",\"report_type\":\"growth\",\"rows\":10,\"sort\":\"date\",\"sources\":[\"3313128290\"],\"start_date\":\"2026-05-24T11:33:12.825Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:13.417542 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.648384, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:12.825Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"categories\",\"rows\":10,\"sources\":[\"3313128290\"],\"start_date\":\"2026-05-24T11:33:12.825Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:13.421504 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.735359, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:12.825Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"emotion\",\"rows\":10,\"sources\":[\"3313128290\"],\"start_date\":\"2026-05-24T11:33:12.825Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:13.520410 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.831635, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:12.825Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"content_type_distribution\",\"rows\":10,\"sources\":[\"3313128290\"],\"start_date\":\"2026-05-24T11:33:12.825Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:13.634171 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.426509, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:12.825Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"posts\",\"rows\":12,\"sort\":\"date\",\"sources\":[\"3313128290\"],\"start_date\":\"2026-05-24T11:33:12.825Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:14.579383 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 1.783093, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:12.825Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"sentiments\",\"rows\":10,\"sources\":[\"3313128290\"],\"start_date\":\"2026-05-24T11:33:12.825Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:17.106137 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 3.901438, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:12.825Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"cloud\",\"rows\":20,\"sources\":[\"3313128290\"],\"start_date\":\"2026-05-24T11:33:12.825Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:18.495755 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 5.28091, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:12.825Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"cloud\",\"rows\":25,\"sources\":[\"3313128290\"],\"start_date\":\"2026-05-24T11:33:12.825Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:24.262600 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 11.56677, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:12.825Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"influence_graph\",\"rows\":20,\"sources\":[\"drpezeshkian\"],\"start_date\":\"2026-05-24T11:33:12.825Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:29.423928 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 16.740727, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:12.825Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"impact_graph\",\"rows\":20,\"sources\":[\"drpezeshkian\"],\"start_date\":\"2026-05-24T11:33:12.825Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:40.413980 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.040252, "ResultError": null, "RequestBody": null, "ActivityName": "User_Account | Profile_Retrieve Profile_Update", "ActivityPath": "/api/v1/account/profile/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-22 11:33:40.626233 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.01486, "ResultError": null, "RequestBody": null, "ActivityName": "Notification | Statistical", "ActivityPath": "/api/v1/notification/statistical/", "ActivityMethod": "GET"}, {"OccurredAt": "2026-08-22 11:33:40.731435 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.110398, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:41.038Z\",\"page\":1,\"platform\":\"twitter\",\"q\":\"drpezeshkian\",\"report_type\":\"source_info\",\"rows\":10,\"start_date\":\"2026-05-24T11:33:41.038Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:41.265192 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.347617, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:41.357Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"sentiments\",\"rows\":10,\"sources\":[\"3313128290\"],\"start_date\":\"2026-05-24T11:33:41.357Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:41.348693 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.372463, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:41.357Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"categories\",\"rows\":10,\"sources\":[\"3313128290\"],\"start_date\":\"2026-05-24T11:33:41.357Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:41.369285 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.385894, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:41.357Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"emotion\",\"rows\":10,\"sources\":[\"3313128290\"],\"start_date\":\"2026-05-24T11:33:41.357Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:41.500091 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.517604, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:41.357Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"content_type_distribution\",\"rows\":10,\"sources\":[\"3313128290\"],\"start_date\":\"2026-05-24T11:33:41.357Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:41.658856 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.738176, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:41.357Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"process\",\"rows\":10,\"sources\":[\"3313128290\"],\"start_date\":\"2026-05-24T11:33:41.357Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:41.674385 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.305136, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:41.357Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"posts\",\"rows\":12,\"sort\":\"date\",\"sources\":[\"3313128290\"],\"start_date\":\"2026-05-24T11:33:41.357Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:42.172354 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 0.796803, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:41.357Z\",\"order\":\"desc\",\"page\":1,\"platform\":\"twitter\",\"q\":\"*\",\"report_type\":\"growth\",\"rows\":10,\"sort\":\"date\",\"sources\":[\"3313128290\"],\"start_date\":\"2026-05-24T11:33:41.357Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:46.030891 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 5.017209, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:41.357Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"cloud\",\"rows\":25,\"sources\":[\"3313128290\"],\"start_date\":\"2026-05-24T11:33:41.357Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:46.344322 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 5.274255, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:41.357Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"cloud\",\"rows\":20,\"sources\":[\"3313128290\"],\"start_date\":\"2026-05-24T11:33:41.357Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:50.192041 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 8.835901, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:41.357Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"influence_graph\",\"rows\":20,\"sources\":[\"drpezeshkian\"],\"start_date\":\"2026-05-24T11:33:41.357Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}, {"OccurredAt": "2026-08-22 11:33:54.782839 +00:00", "Actor": "{\"id\":3,\"organization_id\":38,\"organization_role\":\"owner\",\"role\":1,\"uuid\":\"391ada15-580c-5baa-b16f-eeb35d9b1122\"}", "ResultStatusCode": 200, "ResultDurationSeconds": 13.422167, "ResultError": null, "RequestBody": "{\"end_date\":\"2026-08-22T11:33:41.357Z\",\"page\":1,\"platform\":\"twitter\",\"report_type\":\"impact_graph\",\"rows\":20,\"sources\":[\"drpezeshkian\"],\"start_date\":\"2026-05-24T11:33:41.357Z\"}", "ActivityName": "Search | Retrieve", "ActivityPath": "/api/v1/search/", "ActivityMethod": "POST"}];
+
+/* ---------------- parsing / normalization ---------------- */
+function safeJSON(s){
+  if(s===null || s===undefined || s==='' || s==='NULL') return null;
+  try{ return JSON.parse(s); }catch(e){ return null; }
+}
+function weekStartKey(dt){
+  const d = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()));
+  const dow = d.getUTCDay(); // 0=Sun..6=Sat
+  const diff = (dow===0 ? -6 : 1-dow); // shift back to Monday
+  d.setUTCDate(d.getUTCDate()+diff);
+  return d.toISOString().slice(0,10);
+}
+function normalize(records){
+  return records.map(r=>{
+    const actor = safeJSON(r.Actor);
+    const nameParts = (r.ActivityName||'Unknown').split('|');
+    const module = nameParts[0].trim();
+    const dt = new Date(r.OccurredAt);
+    const valid = !isNaN(dt);
+    return {
+      ts: dt,
+      day: valid ? dt.toISOString().slice(0,10) : null,
+      monthKey: valid ? dt.toISOString().slice(0,7) : null,
+      weekKey: valid ? weekStartKey(dt) : null,
+      userId: actor ? actor.id : null,
+      orgId: actor ? actor.organization_id : null,
+      orgRole: actor ? actor.organization_role : null,
+      status: Number(r.ResultStatusCode),
+      duration: Number(r.ResultDurationSeconds)||0,
+      module: (module && module!=='Unknown') ? module : null,
+      path: r.ActivityPath,
+      method: r.ActivityMethod,
+    };
+  });
+}
+
+/* ---------------- Persian (Jalali) calendar labels ---------------- */
+const FA_CAL = 'fa-IR-u-ca-persian-nu-latn';
+function monthLabel(key){ return new Date(key+'-01T00:00:00Z').toLocaleDateString(FA_CAL, {year:'numeric', month:'long', timeZone:'UTC'}); }
+function weekLabel(key){
+  const start = new Date(key+'T00:00:00Z');
+  const end = new Date(start); end.setUTCDate(end.getUTCDate()+6);
+  const s = start.toLocaleDateString(FA_CAL, {day:'numeric', month:'short', timeZone:'UTC'});
+  const e = end.toLocaleDateString(FA_CAL, {day:'numeric', month:'short', timeZone:'UTC'});
+  return `${s} تا ${e}`;
+}
+function dayLabel(key){ return new Date(key+'T00:00:00Z').toLocaleDateString(FA_CAL, {day:'numeric', month:'long', timeZone:'UTC'}); }
+
+let DATA = normalize(RAW_SAMPLE);
+let CATS = {};
+let filters = { day:new Set(), module:new Set(), method:new Set(), userId:new Set() };
+let drill = { level:'day', month:null, week:null, defaultLevel:'day' };
+const charts = {};
+const DIM_LABEL = { day:'روز', module:'قابلیت', method:'عملیات', userId:'کاربر' };
+
+function fmt(n, d=0){ return Number(n).toLocaleString('en-US',{maximumFractionDigits:d, minimumFractionDigits:d}); }
+function pct(a,b){ return b>0 ? (a/b*100) : 0; }
+function countBy(arr, key){ const o={}; arr.forEach(d=>{ const k=d[key]; if(k==null) return; o[k]=(o[k]||0)+1; }); return o; }
+
+function computeCategories(data){
+  const modCount = countBy(data,'module');
+  const methCount = countBy(data,'method');
+  const usrRows = {};
+  data.forEach(d=>{ if(d.userId!=null) usrRows[d.userId] = (usrRows[d.userId]||0)+1; });
+  return {
+    days: [...new Set(data.map(d=>d.day).filter(Boolean))].sort(),
+    months: [...new Set(data.map(d=>d.monthKey).filter(Boolean))].sort(),
+    weeks: [...new Set(data.map(d=>d.weekKey).filter(Boolean))].sort(),
+    modules: Object.keys(modCount).sort((a,b)=>modCount[b]-modCount[a]),
+    methods: Object.keys(methCount).sort((a,b)=>methCount[b]-methCount[a]),
+    userIds: Object.keys(usrRows).map(Number).sort((a,b)=>usrRows[b]-usrRows[a]),
+  };
+}
+
+function resetState(newData){
+  DATA = newData;
+  filters = { day:new Set(), module:new Set(), method:new Set(), userId:new Set() };
+  CATS = computeCategories(DATA);
+  // pick a sensible default zoom level based on how wide the date range is
+  let lvl = 'day';
+  if(CATS.days.length > 45) lvl = 'month';
+  else if(CATS.days.length > 14) lvl = 'week';
+  drill = { level:lvl, month:null, week:null, defaultLevel:lvl };
+}
+resetState(DATA);
+
+function rerender(){ setTimeout(render, 0); }
+
+function toggleFilter(dim, value){
+  const set = filters[dim];
+  if(set.has(value)) set.delete(value); else set.add(value);
+  // deferred: avoids destroying a Chart.js instance while it is still
+  // mid-dispatch of the very click event that triggered this handler
+  rerender();
+}
+function clearAll(){ Object.values(filters).forEach(s=>s.clear()); rerender(); }
+function clearOne(dim, value){ filters[dim].delete(value); rerender(); }
+
+/* ---- time hierarchy: drill down / up / jump to a granularity ---- */
+function drillInto(key){
+  if(drill.level==='month'){ drill.level='week'; drill.month=key; drill.week=null; }
+  else if(drill.level==='week'){ drill.level='day'; drill.week=key; }
+  rerender();
+}
+function drillUpTo(target){
+  if(target==='root'){ drill = {level:drill.defaultLevel, month:null, week:null, defaultLevel:drill.defaultLevel}; }
+  else if(target==='month'){ drill.level='week'; drill.week=null; }
+  rerender();
+}
+function setGranularity(lvl){
+  if(lvl==='month'){ drill.level='month'; drill.month=null; drill.week=null; }
+  else if(lvl==='week'){ drill.level='week'; drill.week=null; }
+  else { drill.level='day'; }
+  rerender();
+}
+function getTrendView(){
+  let base = getFiltered('day');
+  if(drill.month) base = base.filter(d=>d.monthKey===drill.month);
+  if(drill.week) base = base.filter(d=>d.weekKey===drill.week);
+
+  let keyField, labels;
+  if(drill.level==='month'){ keyField='monthKey'; labels = CATS.months; }
+  else if(drill.level==='week'){
+    keyField='weekKey';
+    labels = drill.month ? CATS.weeks.filter(w=>w.slice(0,7)===drill.month) : CATS.weeks;
+  } else {
+    keyField='day';
+    if(drill.week){
+      const start = new Date(drill.week+'T00:00:00Z');
+      labels = Array.from({length:7}, (_,i)=>{ const d=new Date(start); d.setUTCDate(d.getUTCDate()+i); return d.toISOString().slice(0,10); });
+    } else if(drill.month){
+      labels = CATS.days.filter(dy=>dy.slice(0,7)===drill.month);
+    } else {
+      labels = CATS.days;
+    }
+  }
+  const counts = countBy(base, keyField);
+  return { labels, counts, level:drill.level };
+}
+function labelFor(level, key){
+  if(level==='month') return monthLabel(key);
+  if(level==='week') return weekLabel(key);
+  return dayLabel(key);
+}
+
+function matchFilters(d, excludeDim){
+  for(const dim of ['day','module','method','userId']){
+    if(dim===excludeDim) continue;
+    const set = filters[dim];
+    if(set.size===0) continue;
+    if(!set.has(d[dim])) return false;
+  }
+  return true;
+}
+function getFiltered(excludeDim){ return DATA.filter(d=>matchFilters(d, excludeDim)); }
+function anyFilterActive(){ return Object.values(filters).some(s=>s.size>0); }
+
+/* ---------------- count-up animation ---------------- */
+function animateValue(el, end, decimals, suffix){
+  const start = 0, duration = 650, startTime = performance.now();
+  function step(now){
+    const p = Math.min((now-startTime)/duration, 1);
+    const eased = 1 - Math.pow(1-p, 3);
+    el.textContent = fmt(start + (end-start)*eased, decimals) + (suffix||'');
+    if(p<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+/* ---------------- filter bar ---------------- */
+function renderFilterBar(){
+  const bar = document.getElementById('filterBar');
+  const chips = [];
+  Object.entries(filters).forEach(([dim,set])=>{
+    set.forEach(val=>{
+      chips.push(`<div class="filter-chip"><span class="dim">${DIM_LABEL[dim]}</span> ${dim==='userId' ? '#'+val : val}
+        <button onclick="clearOne('${dim}', ${typeof val==='number' ? val : `'${val}'`})">✕</button></div>`);
+    });
+  });
+  if(!chips.length){
+    bar.innerHTML = `<div class="hint">↳ برای فیلتر متقابل، روی هر بخش از نمودارها، ردیف‌های جدول یا قابلیت‌ها کلیک کنید — مثل داشبوردهای Power BI</div>`;
+  } else {
+    bar.innerHTML = chips.join('') + `<button class="clear-all" onclick="clearAll()">پاک‌کردن همه فیلترها ✕</button>`;
+  }
+}
+
+/* ---------------- render ---------------- */
+function render(){
+  renderFilterBar();
+  const app = document.getElementById('app');
+  if(!DATA.length){ app.innerHTML = '<div class="empty">داده‌ای برای نمایش وجود ندارد.</div>'; return; }
+
+  document.getElementById('rangeLabel').textContent = CATS.days.length ? `${CATS.days[0]} → ${CATS.days[CATS.days.length-1]}` : '—';
+
+  const fAll = getFiltered(null);
+  const fDay = getFiltered('day');
+  const fModule = getFiltered('module');
+  const fMethod = getFiltered('method');
+  const fUser = getFiltered('userId');
+
+  const total = fAll.length;
+  const totalUnfiltered = DATA.length;
+  const usersSet = new Set(fAll.filter(d=>d.userId!=null).map(d=>d.userId));
+  const orgsSet = new Set(fAll.filter(d=>d.orgId!=null).map(d=>d.orgId));
+  const success = fAll.filter(d=>d.status>=200 && d.status<400).length;
+  const errors = fAll.filter(d=>d.status>=400).length;
+  const avgDur = total ? fAll.reduce((s,d)=>s+d.duration,0)/total : 0;
+
+  const dayCount = countBy(fDay,'day');
+  const moduleCount = countBy(fModule,'module');
+  const methodCount = countBy(fMethod,'method');
+  const totalModuleActions = Object.values(moduleCount).reduce((a,b)=>a+b,0);
+
+  const userStats = {};
+  CATS.userIds.forEach(uid=>{ userStats[uid] = {userId:uid, orgId:null, orgRole:null, actions:0, modules:new Set(), success:0, durSum:0}; });
+  fUser.forEach(d=>{
+    if(d.userId==null) return;
+    const u = userStats[d.userId]; if(!u) return;
+    u.actions++; u.orgId = d.orgId; u.orgRole = d.orgRole;
+    if(d.module) u.modules.add(d.module);
+    if(d.status>=200 && d.status<400) u.success++;
+    u.durSum += d.duration;
+  });
+  const users = CATS.userIds.map(uid=>userStats[uid]);
+
+  const avgBreadth = users.length ? users.reduce((s,u)=>s+u.modules.size,0)/users.length : 0;
+  const errorShare = pct(errors,total);
+  const searchTop = Object.entries(moduleCount).sort((a,b)=>b[1]-a[1])[0];
+  const searchShare = searchTop ? pct(searchTop[1], totalModuleActions) : 0;
+  let reliabilityDot = errorShare<3 ? 'ok' : (errorShare<10 ? 'warn':'bad');
+  let breadthDot = avgBreadth >= CATS.modules.length*0.4 ? 'ok' : (avgBreadth >= CATS.modules.length*0.2 ? 'warn':'bad');
+  let sampleDot = (usersSet.size<10 || CATS.days.length<14) ? 'warn' : 'ok';
+
+  let html = '';
+
+  html += `<div class="kpi-grid">
+    <div class="kpi-card" style="animation-delay:.02s">
+      <div class="lbl">کل رویدادها ${anyFilterActive() ? `<span class="mono" style="color:var(--text-faint)">/ ${fmt(totalUnfiltered)}</span>`:''}</div>
+      <div class="val" id="kpiTotal">0</div>
+      <div class="delta">${CATS.days.length} روز پوشش داده</div>
+    </div>
+    <div class="kpi-card" style="animation-delay:.06s">
+      <div class="lbl">کاربران فعال</div>
+      <div class="val" id="kpiUsers">0<span class="unit">کاربر</span></div>
+      <div class="delta">${fmt(orgsSet.size)} سازمان</div>
+    </div>
+    <div class="kpi-card" style="animation-delay:.1s">
+      <div class="lbl">نرخ موفقیت درخواست‌ها</div>
+      <div class="val" id="kpiSuccess">0<span class="unit">%</span></div>
+      <div class="delta">${errors} خطا از ${total} رویداد</div>
+    </div>
+    <div class="kpi-card" style="animation-delay:.14s">
+      <div class="lbl">میانگین زمان پاسخ</div>
+      <div class="val" id="kpiDur">0<span class="unit">ثانیه</span></div>
+      <div class="delta">شاخص کارایی سیستم</div>
+    </div>
+    <div class="kpi-card" style="animation-delay:.18s">
+      <div class="lbl">تنوع قابلیت‌های استفاده‌شده</div>
+      <div class="val" id="kpiModules">${CATS.modules.length}<span class="unit">ماژول</span></div>
+      <div class="delta">عمق استفاده از سامانه</div>
+    </div>
+  </div>`;
+
+  const trendView = getTrendView();
+  const trendLevelFa = {month:'ماهانه', week:'هفتگی', day:'روزانه'}[trendView.level];
+
+  let crumbHtml = `<span class="crumb ${drill.month||drill.week?'clickable':'current'}" onclick="drillUpTo('root')">کل دوره</span>`;
+  if(drill.month){
+    const monthClickable = (drill.level!=='week');
+    crumbHtml += `<span class="crumb-sep">›</span><span class="crumb ${monthClickable?'clickable':'current'}" ${monthClickable?`onclick="drillUpTo('month')"`:''}>${monthLabel(drill.month)}</span>`;
+  }
+  if(drill.week){
+    crumbHtml += `<span class="crumb-sep">›</span><span class="crumb current">${weekLabel(drill.week)}</span>`;
+  }
+
+  html += `<div class="sec-label"><span class="code">SIG-01</span><h2>روند و الگوی استفاده</h2><span class="sub">حجم فعالیت در طول زمان و پرکاربردترین قابلیت‌ها</span></div>`;
+  html += `<div class="grid-2-1">
+    <div class="panel">
+      <h3>روند فعالیت — نمای ${trendLevelFa} <span class="cnt">(${trendView.labels.length} ${drill.level==='month'?'ماه':drill.level==='week'?'هفته':'روز'})</span></h3>
+      <div class="trend-controls">
+        <div class="breadcrumb">${crumbHtml}</div>
+        <div class="gran-toggle">
+          <button class="${drill.level==='month'?'active':''}" onclick="setGranularity('month')">ماه</button>
+          <button class="${drill.level==='week'?'active':''}" onclick="setGranularity('week')">هفته</button>
+          <button class="${drill.level==='day'?'active':''}" onclick="setGranularity('day')">روز</button>
+        </div>
+      </div>
+      <div class="hint-sm">${drill.level==='day' ? 'روی یک نقطه کلیک کنید تا فقط همان روز فیلتر شود' : 'روی یک ستون کلیک کنید تا وارد جزئیات آن شوید'}</div>
+      <canvas id="trendChart" height="230"></canvas>
+    </div>
+    <div class="panel">
+      <h3>پرکاربردترین قابلیت‌ها</h3>
+      <div class="hint-sm">کلیک روی هر ردیف = فیلتر متقابل</div>
+      <div class="rank-list" id="moduleRank"></div>
+    </div>
+  </div>`;
+
+  html += `<div class="sec-label"><span class="code">SIG-02</span><h2>سطح مشارکت کاربران</h2><span class="sub">چه کسانی، چقدر و با چه نوع عملیاتی از سامانه استفاده می‌کنند</span></div>`;
+  html += `<div class="grid-2-1">
+    <div class="panel">
+      <h3>جدول فعالیت کاربران <span class="cnt">(${users.length} کاربر شناسایی‌شده)</span></h3>
+      <div class="hint-sm">کلیک روی هر ردیف برای فیلتر بر اساس آن کاربر</div>
+      <div style="overflow-x:auto;">
+      <table>
+        <thead><tr><th>کاربر</th><th>سازمان</th><th>نقش</th><th class="mono">اقدامات</th><th>تنوع قابلیت</th><th class="mono">نرخ موفقیت</th><th class="mono">میانگین پاسخ</th></tr></thead>
+        <tbody id="userRows"></tbody>
+      </table>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>نوع عملیات (Method)</h3>
+      <div class="hint-sm">GET = دریافت اطلاعات · POST = ایجاد/اجرای عملیات</div>
+      <canvas id="methodChart" height="200"></canvas>
+    </div>
+  </div>`;
+
+  const scoreVal = total ? pct(success,total) : 0;
+  html += `<div class="sec-label"><span class="code">VERDICT</span><h2>جمع‌بندی: آیا سامانه کاربردی است؟</h2><span class="sub">${anyFilterActive() ? 'بر اساس فیلترهای فعال محاسبه شده' : 'بر اساس کل داده'}</span></div>`;
+  html += `<div class="verdict">
+    <div class="verdict-head">
+      <div class="score-badge" id="verdictScore">0%</div>
+      <div>
+        <h3>سیگنال‌های اولیه استفاده مثبت است، اما نمونه فعلی برای قضاوت قطعی کافی نیست</h3>
+        <p>بر اساس ${fmt(total)} رویداد ثبت‌شده در ${CATS.days.length} روز از ${usersSet.size} کاربر شناسایی‌شده</p>
+      </div>
+    </div>
+    <div class="verdict-grid">
+      <div class="vcard">
+        <div class="t"><span class="dot ${reliabilityDot}"></span> پایداری فنی</div>
+        <p>نرخ موفقیت درخواست‌ها <b class="mono" style="color:var(--text)">${fmt(pct(success,total),1)}%</b> است و میانگین زمان پاسخ <b class="mono" style="color:var(--text)">${fmt(avgDur,2)} ثانیه</b>. ${errorShare<3 ? 'در این بازه مشکل پایداری محسوسی دیده نمی‌شود.' : 'نرخ خطا قابل‌توجه است و نیاز به بررسی فنی دارد.'}</p>
+      </div>
+      <div class="vcard">
+        <div class="t"><span class="dot ${breadthDot}"></span> عمق استفاده</div>
+        <p>هر کاربر به‌طور میانگین از <b class="mono" style="color:var(--text)">${avgBreadth.toFixed(1)}</b> قابلیت مجزا از <b class="mono" style="color:var(--text)">${CATS.modules.length}</b> قابلیت موجود استفاده کرده. ${searchTop?`قابلیت «${searchTop[0]}» با ${fmt(searchShare,0)}٪ سهم، اصلی‌ترین محرک استفاده است.`:''}</p>
+      </div>
+      <div class="vcard">
+        <div class="t"><span class="dot ${sampleDot}"></span> کفایت داده برای تصمیم‌گیری</div>
+        <p>${sampleDot==='ok' ? 'حجم داده و بازه زمانی برای استخراج روندهای معنادار (نگهداشت، الگوی هفتگی) کافی به‌نظر می‌رسد.' : `این نمونه فقط ${usersSet.size} کاربر و ${CATS.days.length} روز را پوشش می‌دهد؛ برای سنجش نگهداشت (Retention) و روند واقعی، به بازه حداقل ۴ تا ۶ هفته و داده‌ی کامل نیاز است.`}</p>
+      </div>
+    </div>
+  </div>`;
+
+  html += `<div class="note">
+    <b>محدودیت داده فعلی:</b> این تحلیل روی یک نمونه (${totalUnfiltered} رکورد) انجام شده. برای گزارش نهایی مدیریتی پیشنهاد می‌شود:
+    ۱) داده کامل (بازه چند هفته‌ای) از طریق دکمه «بارگذاری CSV کامل» در بالای صفحه وارد شود تا تمام نمودارها و فیلترها به‌صورت خودکار بازمحاسبه شوند؛
+    ۲) شناسه Session به رویدادها اضافه شود تا معیارهایی مثل مدت هر نشست و نرخ بازگشت کاربر (Retention) قابل محاسبه باشد.
+  </div>`;
+
+  app.innerHTML = html;
+
+  /* ---------------- KPI count-up ---------------- */
+  animateValue(document.getElementById('kpiTotal'), total, 0);
+  animateValue(document.getElementById('kpiUsers'), usersSet.size, 0, ' کاربر');
+  animateValue(document.getElementById('kpiSuccess'), pct(success,total), 1, '%');
+  animateValue(document.getElementById('kpiDur'), avgDur, 2, ' ثانیه');
+  animateValue(document.getElementById('verdictScore'), scoreVal, 0, '%');
+
+  /* ---------------- charts ---------------- */
+  Chart.defaults.font.family = "'Vazirmatn','JetBrains Mono',sans-serif";
+  Chart.defaults.color = '#8892A8';
+  Object.values(charts).forEach(c=>c && c.destroy());
+
+  const isDayLevel = trendView.level==='day';
+  const trendKeys = trendView.labels;
+  const trendDisplay = trendKeys.map(k=>labelFor(trendView.level,k));
+  const trendCounts = trendKeys.map(k=>trendView.counts[k]||0);
+  const trendPointColors = trendKeys.map(k => filters.day.has(k) ? '#F5A623' : (filters.day.size ? 'rgba(245,166,35,.3)' : '#F5A623'));
+
+  charts.trend = new Chart(document.getElementById('trendChart'), {
+    type: isDayLevel ? 'line' : 'bar',
+    data:{ labels:trendDisplay, datasets:[ isDayLevel ? {
+      label:'رویدادها', data:trendCounts,
+      borderColor:'#F5A623', backgroundColor:'rgba(245,166,35,.12)', fill:true, tension:.35,
+      pointRadius:trendKeys.map(k=>filters.day.has(k)?6:3),
+      pointBackgroundColor:trendPointColors, pointHoverRadius:8,
+    } : {
+      label:'رویدادها', data:trendCounts,
+      backgroundColor:'#F5A623', hoverBackgroundColor:'#FFC266', borderRadius:5, maxBarThickness:46,
+    }]},
+    options:{
+      responsive:true, animation:{duration:450},
+      plugins:{legend:{display:false}},
+      interaction: isDayLevel ? {mode:'index', intersect:false} : {mode:'point', intersect:true},
+      elements: isDayLevel ? {point:{hitRadius:16}} : {},
+      scales:{ x:{grid:{color:'#1E2A47'}}, y:{grid:{color:'#1E2A47'}, beginAtZero:true, ticks:{precision:0}} },
+      onClick:(evt,elements)=>{
+        if(!elements.length) return;
+        const key = trendKeys[elements[0].index];
+        if(isDayLevel){ toggleFilter('day', key); } else { drillInto(key); }
+      },
+      onHover:(evt,elements)=>{ evt.native.target.style.cursor = elements.length ? 'pointer':'default'; }
+    }
+  });
+
+  const methodColors = CATS.methods.map(m => filters.method.has(m) ? '#4EC9B0' : (filters.method.size ? 'rgba(78,201,176,.25)' : '#4EC9B0'));
+  charts.method = new Chart(document.getElementById('methodChart'), {
+    type:'bar',
+    data:{ labels:CATS.methods, datasets:[{ data:CATS.methods.map(m=>methodCount[m]||0), backgroundColor:methodColors, borderRadius:4, barThickness:26 }]},
+    options:{
+      indexAxis:'y', responsive:true, animation:{duration:500}, plugins:{legend:{display:false}},
+      scales:{ x:{grid:{color:'#1E2A47'}, beginAtZero:true, ticks:{precision:0}}, y:{grid:{display:false}} },
+      onClick:(evt,elements)=>{ if(elements.length){ const idx=elements[0].index; toggleFilter('method', CATS.methods[idx]); } },
+      onHover:(evt,elements)=>{ evt.native.target.style.cursor = elements.length ? 'pointer':'default'; }
+    }
+  });
+
+  /* ---------------- module rank (custom, clickable) ---------------- */
+  const maxM = Math.max(1, ...CATS.modules.map(m=>moduleCount[m]||0));
+  document.getElementById('moduleRank').innerHTML = CATS.modules.map(name=>{
+    const cnt = moduleCount[name]||0;
+    const isActive = filters.module.has(name);
+    const isDimmed = filters.module.size>0 && !isActive;
+    return `<div class="rank-row ${isActive?'active':''} ${isDimmed?'dimmed':''}" onclick="toggleFilter('module','${name.replace(/'/g,"\\'")}')">
+      <div class="name" title="${name}">${name}</div>
+      <div class="bar-bg"><div class="bar-fill" style="width:${pct(cnt,maxM)}%"></div></div>
+      <div class="num">${cnt}</div>
+    </div>`;
+  }).join('') || '<div class="empty">داده‌ای برای این فیلتر یافت نشد</div>';
+
+  /* ---------------- user table (custom, clickable) ---------------- */
+  document.getElementById('userRows').innerHTML = users.map(u=>{
+    const sr = u.actions ? pct(u.success,u.actions) : 0;
+    const avgD = u.actions ? u.durSum/u.actions : 0;
+    const isActive = filters.userId.has(u.userId);
+    const isDimmed = filters.userId.size>0 && !isActive;
+    return `<tr class="${isActive?'active-row':''} ${isDimmed?'dimmed-row':''}" onclick="toggleFilter('userId', ${u.userId})">
+      <td class="mono">#${u.userId}</td>
+      <td class="mono">${u.orgId!=null ? 'org-'+u.orgId : '—'}</td>
+      <td>${u.orgRole ? `<span class="pill owner">${u.orgRole}</span>` : '—'}</td>
+      <td class="mono">${u.actions}</td>
+      <td>${u.modules.size} <span class="bar-mini"><i style="width:${pct(u.modules.size, CATS.modules.length)}%"></i></span></td>
+      <td class="mono">${fmt(sr,0)}%</td>
+      <td class="mono">${fmt(avgD,2)}s</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7" class="empty">داده‌ای یافت نشد</td></tr>';
+}
+
+/* ---------------- file upload (scale to full dataset) ---------------- */
+document.getElementById('fileInput').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  document.getElementById('srcLabel').textContent = file.name;
+  Papa.parse(file, {
+    header:true, skipEmptyLines:true,
+    complete: function(results){ resetState(normalize(results.data)); render(); },
+    error: function(err){ alert('خطا در خواندن فایل: ' + err.message); }
+  });
+});
+
+render();
+</script>
+</body>
+</html>
