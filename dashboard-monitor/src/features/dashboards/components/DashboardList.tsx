@@ -1,4 +1,4 @@
-import { Activity, ShieldOff } from 'lucide-react'
+import { ShieldOff } from 'lucide-react'
 import { DashboardCard } from './DashboardCard'
 import { useAuthStore } from '@/hooks/useAuthStore'
 

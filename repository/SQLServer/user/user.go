@@ -19,7 +19,7 @@ func (s User) IsPhoneNumberExists(phoneNumber string) (bool, error) {
 		return false, err
 	}
 	defer db.Close()
-	row := db.QueryRow("SELECT id FROM APP.[USER] WHERE PhoneNumber = ?", phoneNumber)
+	row := db.QueryRow("SELECT id FROM APP.[USER] WHERE PhoneNumber = @p1", phoneNumber)
 	if err := row.Scan(&userID); err != nil {
 		if err == sql.ErrNoRows {
 			return false, nil
@@ -39,7 +39,7 @@ func (s User) PersistUser(_userName, _phonNumber, _Password string) (int64, erro
 	}
 	defer db.Close()
 
-	row := db.QueryRow("INSERT INTO APP.[USER] (UserName,PhoneNumber,Password) values (?,?,?) select ID = convert(bigint, SCOPE_IDENTITY())", _userName, _phonNumber, _Password)
+	row := db.QueryRow("INSERT INTO APP.[USER] (UserName,PhoneNumber,Password) values (@p1,@p2,@p3) select ID = convert(bigint, SCOPE_IDENTITY())", _userName, _phonNumber, _Password)
 	if err := row.Scan(&userID); err != nil {
 		return 0, err
 	}
@@ -53,7 +53,7 @@ func (s User) GetPasswordByPhoneNumber(phoneNumber string) (string, error) {
 		return "", err
 	}
 	defer db.Close()
-	row := db.QueryRow("SELECT Password FROM APP.[USER] WHERE PhoneNumber = ?", phoneNumber)
+	row := db.QueryRow("SELECT Password FROM APP.[USER] WHERE PhoneNumber = @p1", phoneNumber)
 	if err := row.Scan(&password); err != nil {
 		if err == sql.ErrNoRows {
 			return "", nil
@@ -70,7 +70,7 @@ func (s User) GetUserIDByPhoneNumber(phoneNumber string) (int64, error) {
 		return 0, err
 	}
 	defer db.Close()
-	row := db.QueryRow("SELECT id FROM APP.[USER] WHERE PhoneNumber = ?", phoneNumber)
+	row := db.QueryRow("SELECT id FROM APP.[USER] WHERE PhoneNumber = @p1", phoneNumber)
 	if err := row.Scan(&userId); err != nil {
 		if err == sql.ErrNoRows {
 			return 0, nil
@@ -89,7 +89,7 @@ func (s User) GetUserByUserID(userID int64) (entity.User, error) {
 	}
 	defer db.Close()
 
-	errTemp := db.Get(&user, "SELECT UserName , PhoneNumber , Password FROM APP.[USER] WHERE ID = ?", userID)
+	errTemp := db.Get(&user, "SELECT UserName , PhoneNumber , Password FROM APP.[USER] WHERE ID = @p1", userID)
 	if errTemp != nil {
 		return user, errTemp
 	}
@@ -116,7 +116,7 @@ func (s User) GetUserLinkListByUserID(userID int64) ([]entity.WebAppList, error)
 	}
 	defer db.Close()
 
-	errTemp := db.Select(&WebAppsTempDB, "SELECT WebAppName ,WebAppLink AS WebAppURL  FROM APP.GetUserListByID WHERE UserID = ?", userID)
+	errTemp := db.Select(&WebAppsTempDB, "SELECT WebAppName ,WebAppLink AS WebAppURL  FROM APP.GetUserListByID WHERE UserID = @p1", userID)
 	if errTemp != nil {
 		return WebApps, errTemp
 	}

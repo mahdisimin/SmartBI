@@ -5,6 +5,7 @@ import { AuthLayout } from '@/components/layout/AuthLayout'
 import LoginPage from '@/pages/LoginPage'
 import RegisterPage from '@/pages/RegisterPage'
 import DashboardsPage from '@/pages/DashboardsPage'
+import SynopsDashboardPage from '@/pages/SynopsDashboardPage'
 import AiChatPage from '@/pages/AiChatPage'
 
 export const router = createBrowserRouter([
@@ -18,6 +19,9 @@ export const router = createBrowserRouter([
     {
         element: <AuthGuard />,
         children: [
+            // Full-bleed page with its own visual theme/topbar — deliberately
+            // outside AppLayout so it isn't nested inside the sidebar shell.
+            { path: '/dashboards/synops', element: <SynopsDashboardPage /> },
             {
                 element: <AppLayout />,
                 children: [

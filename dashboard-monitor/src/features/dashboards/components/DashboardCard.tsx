@@ -1,4 +1,5 @@
-import { ArrowUpRight } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ArrowUpRight, ArrowRight } from 'lucide-react'
 import type { WebApp } from '@/types/auth.types'
 
 interface DashboardCardProps {
@@ -20,26 +21,42 @@ function getColor(name: string) {
     return palette[(name.charCodeAt(0) || 0) % palette.length]
 }
 
+// Convention (matches the backend's WebAppLinkList data): a link starting
+// with "/" is an internal SPA route — opens via the router, same tab.
+// Anything else is an external URL — opens in a new tab. This lets an
+// API-backed, in-app dashboard (like Synops) live in the exact same
+// webAppList / access-control table as external report links, with no
+// separate mechanism needed.
+function isInternalRoute(url: string) {
+    return url.startsWith('/')
+}
+
 export const DashboardCard = ({ app }: DashboardCardProps) => {
     const color = getColor(app.webAppName)
     const initial = app.webAppName.charAt(0).toUpperCase()
+    const internal = isInternalRoute(app.webAppURL)
 
-    return (
-        <a
-            href={app.webAppURL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group flex flex-col p-5 rounded-xl border border-border bg-card hover:border-primary/35 hover:bg-accent/40 transition-all duration-200"
-        >
+    const className =
+        'group flex flex-col p-5 rounded-xl border border-border bg-card hover:border-primary/35 hover:bg-accent/40 transition-all duration-200'
+
+    const content = (
+        <>
             {/* Icon row */}
             <div className="flex items-start justify-between mb-4">
                 <div className={`w-10 h-10 rounded-xl border flex items-center justify-center flex-shrink-0 ${color.bg}`}>
                     <span className={`text-sm font-bold ${color.text}`}>{initial}</span>
                 </div>
-                <ArrowUpRight
-                    size={15}
-                    className="text-muted-foreground/30 group-hover:text-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all duration-200"
-                />
+                {internal ? (
+                    <ArrowRight
+                        size={15}
+                        className="text-muted-foreground/30 group-hover:text-primary group-hover:translate-x-0.5 transition-all duration-200"
+                    />
+                ) : (
+                    <ArrowUpRight
+                        size={15}
+                        className="text-muted-foreground/30 group-hover:text-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all duration-200"
+                    />
+                )}
             </div>
 
             {/* Name & URL */}
@@ -47,8 +64,22 @@ export const DashboardCard = ({ app }: DashboardCardProps) => {
                 {app.webAppName}
             </p>
             <p className="text-xs text-muted-foreground truncate">
-                {app.webAppURL}
+                {internal ? 'Built-in dashboard' : app.webAppURL}
             </p>
+        </>
+    )
+
+    if (internal) {
+        return (
+            <Link to={app.webAppURL} className={className}>
+                {content}
+            </Link>
+        )
+    }
+
+    return (
+        <a href={app.webAppURL} target="_blank" rel="noopener noreferrer" className={className}>
+            {content}
         </a>
     )
 }

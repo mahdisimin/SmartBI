@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
+	"strings"
 	"time"
 
 	"intelligentBI/entity"
@@ -26,74 +26,72 @@ func NewRepository(filePath string) *Repository {
 	return &Repository{FilePath: filePath}
 }
 
-func (r Repository) GetActivityData(product pkg.ProductList, from, to time.Time) (entity.DataSet, error) {
+func (r Repository) GetActivityEvents(product pkg.ProductList, from, to time.Time) ([]entity.ActivityEvent, error) {
 	switch product {
 	case pkg.SynOps:
-		return r.getSynopsActivityData(from, to)
+		return r.getSynopsActivityEvents(from, to)
 	default:
-		return entity.DataSet{}, fmt.Errorf("file repository: unsupported product %d", product)
+		return nil, fmt.Errorf("file repository: unsupported product %d", product)
 	}
 }
 
-func (r Repository) getSynopsActivityData(from, to time.Time) (entity.DataSet, error) {
+func (r Repository) getSynopsActivityEvents(from, to time.Time) ([]entity.ActivityEvent, error) {
 	data, err := os.ReadFile(r.FilePath)
 	if err != nil {
-		return entity.DataSet{}, err
+		return nil, err
 	}
 
-	var events []entity.UserActivityEvent
-	if err := json.Unmarshal(data, &events); err != nil {
-		return entity.DataSet{}, err
+	var raw []entity.UserActivityEvent
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, err
 	}
 
-	columns := []string{
-		"EventID", "EventType", "SchemaVersion", "OccurredAt", "Source", "Actor",
-		"ResultStatusCode", "ResultDurationSeconds", "ResultError",
-		"RequestCountry", "RequestIPAddress", "RequestUserAgent", "RequestBody", "RequestQueryParams",
-		"ActivityID", "ActivityName", "ActivityPath", "ActivityMethod",
-	}
-
-	rows := make([][]any, 0, len(events))
-	for _, event := range events {
+	events := make([]entity.ActivityEvent, 0, len(raw))
+	for _, event := range raw {
 		if event.OccurredAt.Before(from) || event.OccurredAt.After(to) {
 			continue
 		}
-		rows = append(rows, []any{
-			event.EventID,
-			event.EventType,
-			strconv.Itoa(event.SchemaVersion),
-			event.OccurredAt.Format(time.RFC3339),
-			event.Source,
-			jsonCell(event.Actor),
-			strconv.Itoa(event.Result.StatusCode),
-			strconv.FormatFloat(event.Result.DurationSeconds, 'f', -1, 64),
-			jsonCell(event.Result.Error),
-			event.Request.Country,
-			event.Request.IPAddress,
-			event.Request.UserAgent,
-			jsonCell(event.Request.Body),
-			jsonCell(event.Request.QueryParams),
-			strconv.FormatInt(event.Activity.ID, 10),
-			event.Activity.Name,
-			event.Activity.Path,
-			event.Activity.Method,
-		})
+		events = append(events, toActivityEvent(event))
 	}
-
-	return entity.DataSet{Columns: columns, Rows: rows}, nil
+	return events, nil
 }
 
-// jsonCell mirrors the encoding used when this data is persisted to SQL
-// Server (see repository/SQLServer/synops/useractivity.go's nullableJSON):
-// nil stays nil (-> JSON null), anything else is embedded as raw JSON so it
-// round-trips as real JSON, not an escaped string.
-func jsonCell(value any) any {
-	if value == nil {
-		return nil
+// synopsActor is the subset of the Actor JSON blob the dashboard needs.
+type synopsActor struct {
+	ID               *int64 `json:"id"`
+	OrganizationID   *int64 `json:"organization_id"`
+	OrganizationRole string `json:"organization_role"`
+}
+
+func toActivityEvent(event entity.UserActivityEvent) entity.ActivityEvent {
+	var a synopsActor
+	if event.Actor != nil {
+		// event.Actor was unmarshaled generically (as `any`), so round-trip it
+		// through JSON rather than assuming its dynamic Go type.
+		if data, err := json.Marshal(event.Actor); err == nil {
+			_ = json.Unmarshal(data, &a)
+		}
 	}
-	data, err := json.Marshal(value)
-	if err != nil {
-		return nil
+
+	return entity.ActivityEvent{
+		OccurredAt: event.OccurredAt,
+		UserID:     a.ID,
+		OrgID:      a.OrganizationID,
+		OrgRole:    a.OrganizationRole,
+		Status:     event.Result.StatusCode,
+		Duration:   event.Result.DurationSeconds,
+		Module:     extractModule(event.Activity.Name),
+		Method:     event.Activity.Method,
 	}
-	return json.RawMessage(data)
+}
+
+// extractModule mirrors repository/SQLServer/synops/export.go's helper of the
+// same name: pulls the module out of Synops's "Module | Sub-action"
+// activity-name convention.
+func extractModule(activityName string) string {
+	module := strings.TrimSpace(strings.SplitN(activityName, "|", 2)[0])
+	if module == "" || module == "Unknown" {
+		return ""
+	}
+	return module
 }
