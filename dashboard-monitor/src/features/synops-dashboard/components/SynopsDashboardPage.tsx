@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 import { Line, Bar } from 'react-chartjs-2'
+import { isAxiosError } from 'axios'
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -15,7 +16,7 @@ import {
 import { useDashboardData } from '../hooks/useDashboardData'
 import { useDashboardFilters } from '../hooks/useDashboardFilters'
 import { fmt, pct, labelFor } from '../dateLabels'
-import type { DashboardData, TrendLevel } from '../types'
+import type { DashboardData, FilterEntry, TrendLevel } from '../types'
 import '../synops-dashboard.css'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Tooltip, Filler)
@@ -28,7 +29,23 @@ const COLORS = {
     grid: '#1E2A47',
 }
 
-const DIM_LABEL: Record<string, string> = {
+/** Props that make a clickable non-button element keyboard-operable (Enter/Space). */
+function pressable(onActivate: () => void, pressed: boolean) {
+    return {
+        role: 'button',
+        tabIndex: 0,
+        'aria-pressed': pressed,
+        onClick: onActivate,
+        onKeyDown: (e: React.KeyboardEvent) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onActivate()
+            }
+        },
+    } as const
+}
+
+const DIM_LABEL: Record<FilterEntry['dim'], string> = {
     days: 'روز',
     modules: 'قابلیت',
     methods: 'عملیات',
@@ -52,6 +69,23 @@ export const SynopsDashboardPage = () => {
             <div className="synops-dashboard">
                 <div className="wrap">
                     <div className="empty">در حال بارگذاری داشبورد...</div>
+                </div>
+            </div>
+        )
+    }
+
+    // 403 = logged in, but this product hasn't been granted to the user
+    if (isAxiosError(error) && error.response?.status === 403) {
+        return (
+            <div className="synops-dashboard">
+                <div className="wrap">
+                    <div className="empty">
+                        <p>شما به این داشبورد دسترسی ندارید. برای دریافت دسترسی با مدیر سامانه تماس بگیرید.</p>
+                        <Link to="/" className="back-link">
+                            <ArrowRight size={14} />
+                            بازگشت به داشبوردها
+                        </Link>
+                    </div>
                 </div>
             </div>
         )
@@ -94,9 +128,9 @@ export const SynopsDashboardPage = () => {
                                 level={trendLevel}
                                 setLevel={setTrendLevel}
                                 activeDays={filters.days}
-                                onPointClick={(key) => toggle('days', key)}
+                                onPointClick={(key) => toggle({ dim: 'days', value: key })}
                             />
-                            <ModuleRankPanel data={data} activeModules={filters.modules} onToggle={(name) => toggle('modules', name)} />
+                            <ModuleRankPanel data={data} activeModules={filters.modules} onToggle={(name) => toggle({ dim: 'modules', value: name })} />
                         </div>
 
                         <div className="sec-label">
@@ -105,8 +139,8 @@ export const SynopsDashboardPage = () => {
                             <span className="sub">چه کسانی، چقدر و با چه نوع عملیاتی از سامانه استفاده می‌کنند</span>
                         </div>
                         <div className="grid-2-1">
-                            <UserTablePanel data={data} activeUsers={filters.userIds} onToggle={(id) => toggle('userIds', id)} />
-                            <MethodPanel data={data} activeMethods={filters.methods} onToggle={(name) => toggle('methods', name)} />
+                            <UserTablePanel data={data} activeUsers={filters.userIds} onToggle={(id) => toggle({ dim: 'userIds', value: id })} />
+                            <MethodPanel data={data} activeMethods={filters.methods} onToggle={(name) => toggle({ dim: 'methods', value: name })} />
                         </div>
 
                         <div className="sec-label">
@@ -154,7 +188,7 @@ const FilterBar = ({
     clearOne: ReturnType<typeof useDashboardFilters>['clearOne']
     clearAll: () => void
 }) => {
-    const chips: { dim: 'days' | 'modules' | 'methods' | 'userIds'; value: string | number }[] = []
+    const chips: FilterEntry[] = []
     filters.days.forEach((v) => chips.push({ dim: 'days', value: v }))
     filters.modules.forEach((v) => chips.push({ dim: 'modules', value: v }))
     filters.methods.forEach((v) => chips.push({ dim: 'methods', value: v }))
@@ -168,11 +202,11 @@ const FilterBar = ({
                 </div>
             ) : (
                 <>
-                    {chips.map(({ dim, value }) => (
-                        <div className="filter-chip" key={`${dim}-${value}`}>
-                            <span className="dim">{DIM_LABEL[dim]}</span>
-                            {dim === 'userIds' ? `#${value}` : value}
-                            <button onClick={() => clearOne(dim, value)}>✕</button>
+                    {chips.map((chip) => (
+                        <div className="filter-chip" key={`${chip.dim}-${chip.value}`}>
+                            <span className="dim">{DIM_LABEL[chip.dim]}</span>
+                            {chip.dim === 'userIds' ? `#${chip.value}` : chip.value}
+                            <button onClick={() => clearOne(chip)}>✕</button>
                         </div>
                     ))}
                     <button className="clear-all" onClick={clearAll}>
@@ -341,7 +375,7 @@ const ModuleRankPanel = ({
                             <div
                                 key={m.name}
                                 className={`rank-row ${isActive ? 'active' : ''} ${isDimmed ? 'dimmed' : ''}`}
-                                onClick={() => onToggle(m.name)}
+                                {...pressable(() => onToggle(m.name), isActive)}
                             >
                                 <div className="name" title={m.name}>{m.name}</div>
                                 <div className="bar-bg"><div className="bar-fill" style={{ width: `${pct(m.count, max)}%` }} /></div>
@@ -434,7 +468,21 @@ const UserTablePanel = ({
                                     className={`${isActive ? 'active-row' : ''} ${isDimmed ? 'dimmed-row' : ''}`}
                                     onClick={() => onToggle(u.user_id)}
                                 >
-                                    <td className="mono">#{u.user_id}</td>
+                                    {/* Real button keeps the <tr> a plain row for screen readers;
+                                        stopPropagation avoids a double toggle via the row's onClick. */}
+                                    <td className="mono">
+                                        <button
+                                            type="button"
+                                            className="row-toggle"
+                                            aria-pressed={isActive}
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                onToggle(u.user_id)
+                                            }}
+                                        >
+                                            #{u.user_id}
+                                        </button>
+                                    </td>
                                     <td className="mono">{u.org_id != null ? `org-${u.org_id}` : '—'}</td>
                                     <td>{u.org_role ? <span className="pill owner">{u.org_role}</span> : '—'}</td>
                                     <td className="mono">{u.actions}</td>

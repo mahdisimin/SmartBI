@@ -2,16 +2,18 @@ package main
 
 import (
 	echowebframework "intelligentBI/delivery/echo/router"
+	"intelligentBI/repository/SQLServer"
 	"log"
 )
 
 func main() {
-	//err := nethttp.Router()
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
+	db, err := SQLServer.NewDB()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
 
-	if err := echowebframework.Router(); err != nil {
+	if err := echowebframework.Router(db); err != nil {
 		log.Fatal(err)
 	}
 }

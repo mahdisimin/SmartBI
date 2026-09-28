@@ -11,7 +11,7 @@ export const LoginForm = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        await login({ phone_number: phoneNumber, password })
+        await login({ phone_number: phoneNumber.trim(), password })
     }
 
     return (

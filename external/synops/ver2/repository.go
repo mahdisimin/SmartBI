@@ -10,3 +10,9 @@ import "intelligentBI/entity"
 type UserActivityRepository interface {
 	PersistUserActivity(event entity.UserActivityEvent) error
 }
+
+// DeadLetterRepository persists a message the worker could not process, so it
+// is stored instead of dropped.
+type DeadLetterRepository interface {
+	PersistDeadLetter(msg entity.DeadLetterMessage) error
+}

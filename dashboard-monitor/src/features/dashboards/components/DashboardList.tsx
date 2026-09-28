@@ -1,9 +1,9 @@
 import { ShieldOff } from 'lucide-react'
 import { DashboardCard } from './DashboardCard'
-import { useAuthStore } from '@/hooks/useAuthStore'
+import { useSession } from '@/features/auth/hooks/useSession'
 
 export const DashboardList = () => {
-    const user = useAuthStore((s) => s.user)
+    const { data: user } = useSession()
 
     if (!user) return null
 

@@ -48,12 +48,18 @@ func (r Repository) getSynopsActivityEvents(from, to time.Time) ([]entity.Activi
 
 	events := make([]entity.ActivityEvent, 0, len(raw))
 	for _, event := range raw {
-		if event.OccurredAt.Before(from) || event.OccurredAt.After(to) {
+		if event.OccurredAt.Before(from) || event.OccurredAt.After(to) || isSynopsHealthCheck(event) {
 			continue
 		}
 		events = append(events, toActivityEvent(event))
 	}
 	return events, nil
+}
+
+// isSynopsHealthCheck mirrors repository/SQLServer/synops/export.go's
+// synopsHealthCheckFilter: uptime-monitoring probes are not user activity.
+func isSynopsHealthCheck(event entity.UserActivityEvent) bool {
+	return event.Activity.Name == "health-check" || event.Activity.Path == "/healthy"
 }
 
 // synopsActor is the subset of the Actor JSON blob the dashboard needs.

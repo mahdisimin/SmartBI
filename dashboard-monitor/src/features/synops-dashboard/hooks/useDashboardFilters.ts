@@ -1,14 +1,33 @@
 import { useCallback, useState } from 'react'
-import { emptyFilters, type DashboardFilters } from '../types'
-
-type Dimension = keyof DashboardFilters
+import { emptyFilters, type DashboardFilters, type FilterEntry } from '../types'
 
 export interface UseDashboardFiltersReturn {
     filters: DashboardFilters
-    toggle: (dim: Dimension, value: string | number) => void
-    clearOne: (dim: Dimension, value: string | number) => void
+    toggle: (entry: FilterEntry) => void
+    clearOne: (entry: FilterEntry) => void
     clearAll: () => void
     anyActive: boolean
+}
+
+type SetOp = <T>(set: Set<T>, value: T) => Set<T>
+
+const toggled: SetOp = (set, value) => {
+    const next = new Set(set)
+    if (next.has(value)) next.delete(value)
+    else next.add(value)
+    return next
+}
+
+const without: SetOp = (set, value) => {
+    const next = new Set(set)
+    next.delete(value)
+    return next
+}
+
+/** Returns a new filter state with `op` applied to the entry's dimension. */
+function apply(prev: DashboardFilters, entry: FilterEntry, op: SetOp): DashboardFilters {
+    if (entry.dim === 'userIds') return { ...prev, userIds: op(prev.userIds, entry.value) }
+    return { ...prev, [entry.dim]: op(prev[entry.dim], entry.value) }
 }
 
 /** Mirrors the sample dashboard's toggleFilter/clearOne/clearAll — cross-filter
@@ -16,22 +35,12 @@ export interface UseDashboardFiltersReturn {
 export function useDashboardFilters(): UseDashboardFiltersReturn {
     const [filters, setFilters] = useState<DashboardFilters>(emptyFilters)
 
-    const toggle = useCallback((dim: Dimension, value: string | number) => {
-        setFilters((prev) => {
-            const next = { ...prev, [dim]: new Set(prev[dim] as Set<any>) }
-            const set = next[dim] as Set<any>
-            if (set.has(value)) set.delete(value)
-            else set.add(value)
-            return next
-        })
+    const toggle = useCallback((entry: FilterEntry) => {
+        setFilters((prev) => apply(prev, entry, toggled))
     }, [])
 
-    const clearOne = useCallback((dim: Dimension, value: string | number) => {
-        setFilters((prev) => {
-            const next = { ...prev, [dim]: new Set(prev[dim] as Set<any>) }
-            ;(next[dim] as Set<any>).delete(value)
-            return next
-        })
+    const clearOne = useCallback((entry: FilterEntry) => {
+        setFilters((prev) => apply(prev, entry, without))
     }, [])
 
     const clearAll = useCallback(() => setFilters(emptyFilters()), [])

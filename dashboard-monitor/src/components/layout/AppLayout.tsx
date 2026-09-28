@@ -1,6 +1,7 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink } from 'react-router-dom'
 import { Activity, LayoutDashboard, MessageSquare, LogOut } from 'lucide-react'
-import { useAuthStore } from '@/hooks/useAuthStore'
+import { useSession } from '@/features/auth/hooks/useSession'
+import { useLogout } from '@/features/auth/hooks/useLogout'
 import { cn } from '@/lib/utils'
 
 const navItems = [
@@ -9,14 +10,8 @@ const navItems = [
 ]
 
 export const AppLayout = () => {
-    const clearAuth = useAuthStore((s) => s.clearAuth)
-    const user = useAuthStore((s) => s.user)
-    const navigate = useNavigate()
-
-    const handleLogout = () => {
-        clearAuth()
-        navigate('/login', { replace: true })
-    }
+    const { data: user } = useSession()
+    const { logout, isLoading: isLoggingOut } = useLogout()
 
     const initials = user?.userName
         ? user.userName.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
@@ -86,8 +81,9 @@ export const AppLayout = () => {
                         </div>
                     )}
                     <button
-                        onClick={handleLogout}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                        onClick={logout}
+                        disabled={isLoggingOut}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-50"
                     >
                         <LogOut size={14} />
                         Sign out

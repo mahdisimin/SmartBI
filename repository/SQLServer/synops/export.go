@@ -9,7 +9,6 @@ import (
 
 	"intelligentBI/entity"
 	"intelligentBI/pkg"
-	"intelligentBI/repository/SQLServer"
 )
 
 // GetActivityEvents implements service/export.Repo: given a product, it
@@ -26,17 +25,27 @@ func (s UserActivity) GetActivityEvents(product pkg.ProductList, from, to time.T
 	}
 }
 
-func (s UserActivity) getSynopsActivityEvents(from, to time.Time) ([]entity.ActivityEvent, error) {
-	db, err := SQLServer.Connect()
-	if err != nil {
-		return nil, err
-	}
-	defer db.Close()
+// synopsHealthCheckFilter excludes uptime-monitoring probes, which are not
+// user activity. In the data every probe carries all of: ActivityName
+// 'health-check' (Synops's own classification), path '/healthy', user agent
+// "Blackbox Exporter/...", and no actor — the three request markers select
+// exactly the same rows (5,538 of 15,740 at the time of writing), and no
+// request with an actor matches. The name is the primary signal; the path is
+// a backstop in case the source renames the activity.
+const synopsHealthCheckFilter = `ActivityName <> 'health-check' AND ActivityPath <> '/healthy'`
 
-	sqlRows, err := db.Query(`SELECT OccurredAt, Actor, ResultStatusCode, ResultDurationSeconds, ActivityName, ActivityMethod
+func (s UserActivity) getSynopsActivityEvents(from, to time.Time) ([]entity.ActivityEvent, error) {
+	query := `SELECT OccurredAt, Actor, ResultStatusCode, ResultDurationSeconds, ActivityName, ActivityMethod
 		FROM synops.UserActivity
-		WHERE OccurredAt >= @p1 AND OccurredAt <= @p2
-		ORDER BY OccurredAt`, from, to)
+		WHERE OccurredAt <= @p1 AND ` + synopsHealthCheckFilter
+	args := []any{to}
+	if !from.IsZero() { // zero `from` = full history, no lower bound
+		query += ` AND OccurredAt >= @p2`
+		args = append(args, from)
+	}
+	query += ` ORDER BY OccurredAt`
+
+	sqlRows, err := s.DB.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}

@@ -1,17 +1,23 @@
 package export
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"time"
 
 	"intelligentBI/entity"
 	"intelligentBI/pkg"
+
+	_ "time/tzdata" // embed the tz database for dashboardLocation
+
+	"github.com/jalaali/go-jalaali"
 )
 
 // Repo is implemented by the repository layer. Given a product/system, it
 // resolves which table holds that system's data and returns the normalized
-// per-event facts for the given time range. The repository owns interpreting
+// per-event facts for the given time range (a zero `from` means no lower
+// bound). The repository owns interpreting
 // that system's raw schema (parsing an actor blob, extracting a module name
 // from an activity name, ...); this service owns turning those facts into
 // the aggregated numbers a dashboard actually renders — no raw event ever
@@ -20,11 +26,34 @@ type Repo interface {
 	GetActivityEvents(product pkg.ProductList, from, to time.Time) ([]entity.ActivityEvent, error)
 }
 
-// exportLookbackMonths is how far back an export goes.
-const exportLookbackMonths = 2
+// dashboardLocation is the time zone trend buckets (day / week / month) and
+// the day filter are computed in: the dashboard's users are in Iran, so a
+// "day" is a Tehran calendar day, not a UTC one. The tz database is embedded
+// (time/tzdata) so this works on hosts without one, e.g. Windows servers.
+var dashboardLocation = mustLoadLocation("Asia/Tehran")
+
+func mustLoadLocation(name string) *time.Location {
+	loc, err := time.LoadLocation(name)
+	if err != nil {
+		panic(fmt.Sprintf("load time zone %q: %v", name, err))
+	}
+	return loc
+}
+
+// AccessRepo answers whether a user may see a product's dashboard.
+type AccessRepo interface {
+	HasDashboardAccess(userID int64, link string) (bool, error)
+}
+
+// ErrForbidden is returned when the requesting user has not been granted
+// access to the product.
+var ErrForbidden = errors.New("no access to this product")
 
 type ExportService struct {
 	Repository Repo
+	// Access authorizes every export. When nil, every export is denied
+	// (fail closed) — wire it up in production code.
+	Access AccessRepo
 }
 
 func NewExportService(repo Repo) *ExportService {
@@ -42,20 +71,45 @@ type Filters struct {
 }
 
 type ExportRequest struct {
+	// UserID is the authenticated user the export is for.
+	UserID  int64
 	Product pkg.ProductList
 	Filters Filters
 }
 
+// Export returns ErrForbidden unless request.UserID has been granted the
+// product's dashboard.
 func (e ExportService) Export(request ExportRequest) (entity.DashboardData, error) {
-	to := time.Now()
-	from := to.AddDate(0, -exportLookbackMonths, 0)
+	if err := e.authorize(request.UserID, request.Product); err != nil {
+		return entity.DashboardData{}, err
+	}
 
-	events, err := e.Repository.GetActivityEvents(request.Product, from, to)
+	// The export covers the product's full history: a zero `from` means no
+	// lower bound.
+	events, err := e.Repository.GetActivityEvents(request.Product, time.Time{}, time.Now())
 	if err != nil {
 		return entity.DashboardData{}, fmt.Errorf("fetch activity events: %w", err)
 	}
 
 	return buildDashboardData(events, request.Filters), nil
+}
+
+func (e ExportService) authorize(userID int64, product pkg.ProductList) error {
+	if e.Access == nil {
+		return ErrForbidden
+	}
+	link, ok := pkg.DashboardLink(product)
+	if !ok {
+		return ErrForbidden
+	}
+	granted, err := e.Access.HasDashboardAccess(userID, link)
+	if err != nil {
+		return fmt.Errorf("check access: %w", err)
+	}
+	if !granted {
+		return ErrForbidden
+	}
+	return nil
 }
 
 // ---------------------------------------------------------------------------
@@ -106,7 +160,7 @@ func newActiveFilters(f Filters) activeFilters {
 // `exclude`.
 func (af activeFilters) matches(ev entity.ActivityEvent, exclude string) bool {
 	if exclude != "day" && len(af.days) > 0 {
-		if !af.days.has(ev.OccurredAt.UTC().Format("2006-01-02")) {
+		if !af.days.has(dayKey(ev.OccurredAt)) {
 			return false
 		}
 	}
@@ -164,9 +218,9 @@ func buildCategories(events []entity.ActivityEvent) categories {
 	var userOrder []int64
 
 	for _, ev := range events {
-		daySet[ev.OccurredAt.UTC().Format("2006-01-02")] = struct{}{}
+		daySet[dayKey(ev.OccurredAt)] = struct{}{}
 		weekSet[weekStartKey(ev.OccurredAt)] = struct{}{}
-		monthSet[ev.OccurredAt.UTC().Format("2006-01")] = struct{}{}
+		monthSet[monthKey(ev.OccurredAt)] = struct{}{}
 
 		if ev.Module != "" {
 			if _, seen := moduleCounts[ev.Module]; !seen {
@@ -228,13 +282,13 @@ func buildDashboardData(events []entity.ActivityEvent, filters Filters) entity.D
 	return entity.DashboardData{
 		KPIs: kpis,
 		DailyTrend: trendFor(cats.days, fDay, func(ev entity.ActivityEvent) string {
-			return ev.OccurredAt.UTC().Format("2006-01-02")
+			return dayKey(ev.OccurredAt)
 		}),
 		WeeklyTrend: trendFor(cats.weeks, fDay, func(ev entity.ActivityEvent) string {
 			return weekStartKey(ev.OccurredAt)
 		}),
 		MonthlyTrend: trendFor(cats.months, fDay, func(ev entity.ActivityEvent) string {
-			return ev.OccurredAt.UTC().Format("2006-01")
+			return monthKey(ev.OccurredAt)
 		}),
 		TopModules:      rankedFor(cats.modules, fModule, func(ev entity.ActivityEvent) string { return ev.Module }),
 		MethodBreakdown: rankedFor(cats.methods, fMethod, func(ev entity.ActivityEvent) string { return ev.Method }),
@@ -331,16 +385,38 @@ func userStatsFor(userIDs []int64, events []entity.ActivityEvent) []entity.UserS
 	return result
 }
 
-// weekStartKey returns the Monday that starts the ISO-ish week containing t,
-// matching the dashboard's own weekStartKey (Date.UTC + shift-back-to-Monday).
-func weekStartKey(t time.Time) string {
-	t = t.UTC()
-	weekday := int(t.Weekday()) // Sunday=0 .. Saturday=6
-	diff := 1 - weekday
-	if weekday == 0 {
-		diff = -6
+// dayKey, weekStartKey and monthKey bucket an event by its calendar day,
+// week and month in dashboardLocation, following Iranian conventions:
+//
+//   - day:   Gregorian date, "2006-01-02".
+//   - week:  weeks start on Saturday; keyed by that Saturday's Gregorian
+//     date, "2006-01-02".
+//   - month: Solar Hijri (Jalali) month, keyed "YYYY-MM" in the Jalali
+//     calendar, e.g. "1405-06" for Shahrivar 1405. Buckets follow real
+//     Persian month boundaries (1 Shahrivar = 23 Aug), not Gregorian ones.
+func dayKey(t time.Time) string { return t.In(dashboardLocation).Format("2006-01-02") }
+
+// invalidMonthKey buckets timestamps the Jalali conversion cannot handle; it
+// sorts before every real month.
+const invalidMonthKey = "0000-00"
+
+func monthKey(t time.Time) string {
+	t = t.In(dashboardLocation)
+	jy, jm, _, err := jalaali.ToJalaali(t.Year(), t.Month(), t.Day())
+	if err != nil {
+		// Only outside the algorithm's range (Jalali years -61..3177), i.e. a
+		// corrupt timestamp — DATETIMEOFFSET itself allows years 1..9999.
+		// Bucket it visibly instead of failing the whole export.
+		return invalidMonthKey
 	}
-	start := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, diff)
+	return fmt.Sprintf("%04d-%02d", jy, int(jm))
+}
+
+func weekStartKey(t time.Time) string {
+	t = t.In(dashboardLocation)
+	// Days since the most recent Saturday: Saturday=0, Sunday=1 .. Friday=6.
+	sinceSaturday := (int(t.Weekday()) + 1) % 7
+	start := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, dashboardLocation).AddDate(0, 0, -sinceSaturday)
 	return start.Format("2006-01-02")
 }
 

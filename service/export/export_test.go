@@ -2,6 +2,7 @@ package export_test
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,43 +17,45 @@ import (
 func TestExportService_Export(t *testing.T) {
 	svc := newTestService(t)
 
-	data, err := svc.Export(export.ExportRequest{Product: pkg.SynOps})
+	data, err := svc.Export(export.ExportRequest{UserID: grantedUserID, Product: pkg.SynOps})
 	if err != nil {
 		t.Fatalf("Export returned error: %v", err)
 	}
 
-	if data.KPIs.TotalEvents != 4 {
-		t.Fatalf("expected 4 in-range events, got %d", data.KPIs.TotalEvents)
+	// Full history: the 3-month-old Gamma event counts too; the health-check
+	// probe does not.
+	if data.KPIs.TotalEvents != 5 {
+		t.Fatalf("expected 5 events (full history, probe excluded), got %d", data.KPIs.TotalEvents)
 	}
-	if data.KPIs.UniqueUsers != 2 {
-		t.Fatalf("expected 2 unique users, got %d", data.KPIs.UniqueUsers)
+	if data.KPIs.UniqueUsers != 3 {
+		t.Fatalf("expected 3 unique users, got %d", data.KPIs.UniqueUsers)
 	}
-	if data.KPIs.UniqueOrgs != 2 {
-		t.Fatalf("expected 2 unique orgs, got %d", data.KPIs.UniqueOrgs)
+	if data.KPIs.UniqueOrgs != 3 {
+		t.Fatalf("expected 3 unique orgs, got %d", data.KPIs.UniqueOrgs)
 	}
-	if data.KPIs.SuccessCount != 3 {
-		t.Fatalf("expected 3 successful events, got %d", data.KPIs.SuccessCount)
+	if data.KPIs.SuccessCount != 4 {
+		t.Fatalf("expected 4 successful events, got %d", data.KPIs.SuccessCount)
 	}
 	if data.KPIs.ErrorCount != 1 {
 		t.Fatalf("expected 1 error event, got %d", data.KPIs.ErrorCount)
 	}
-	if data.KPIs.ModuleCount != 2 {
-		t.Fatalf("expected 2 distinct modules (Unknown excluded), got %d", data.KPIs.ModuleCount)
+	if data.KPIs.ModuleCount != 3 {
+		t.Fatalf("expected 3 distinct modules (Unknown excluded), got %d", data.KPIs.ModuleCount)
 	}
-	if data.KPIs.DaysCovered != 4 {
-		t.Fatalf("expected 4 distinct days, got %d", data.KPIs.DaysCovered)
+	if data.KPIs.DaysCovered != 5 {
+		t.Fatalf("expected 5 distinct days, got %d", data.KPIs.DaysCovered)
 	}
 
-	if len(data.TopModules) != 2 || data.TopModules[0].Name != "Alpha" || data.TopModules[0].Count != 2 {
+	if len(data.TopModules) != 3 || data.TopModules[0].Name != "Alpha" || data.TopModules[0].Count != 2 {
 		t.Fatalf("expected Alpha ranked first with count 2, got %+v", data.TopModules)
 	}
 
-	if len(data.MethodBreakdown) != 2 || data.MethodBreakdown[0].Name != "GET" || data.MethodBreakdown[0].Count != 3 {
-		t.Fatalf("expected GET ranked first with count 3, got %+v", data.MethodBreakdown)
+	if len(data.MethodBreakdown) != 2 || data.MethodBreakdown[0].Name != "GET" || data.MethodBreakdown[0].Count != 4 {
+		t.Fatalf("expected GET ranked first with count 4, got %+v", data.MethodBreakdown)
 	}
 
-	if len(data.Users) != 2 {
-		t.Fatalf("expected 2 users in the table, got %d", len(data.Users))
+	if len(data.Users) != 3 {
+		t.Fatalf("expected 3 users in the table, got %d", len(data.Users))
 	}
 	u1 := data.Users[0]
 	if u1.UserID != 1 || u1.Actions != 2 || u1.ModuleBreadth != 1 || u1.SuccessRate != 100 {
@@ -83,6 +86,7 @@ func TestExportService_CrossFilter(t *testing.T) {
 	svc := newTestService(t)
 
 	data, err := svc.Export(export.ExportRequest{
+		UserID:  grantedUserID,
 		Product: pkg.SynOps,
 		Filters: export.Filters{Modules: []string{"Alpha"}},
 	})
@@ -97,14 +101,14 @@ func TestExportService_CrossFilter(t *testing.T) {
 	if data.KPIs.UniqueUsers != 1 {
 		t.Fatalf("expected 1 unique user once filtered to module=Alpha, got %d", data.KPIs.UniqueUsers)
 	}
-	// ModuleCount stays global (2), unaffected by the active module filter.
-	if data.KPIs.ModuleCount != 2 {
-		t.Fatalf("expected ModuleCount to stay global at 2, got %d", data.KPIs.ModuleCount)
+	// ModuleCount stays global (3), unaffected by the active module filter.
+	if data.KPIs.ModuleCount != 3 {
+		t.Fatalf("expected ModuleCount to stay global at 3, got %d", data.KPIs.ModuleCount)
 	}
 
 	// The module panel excludes its own dimension: both modules still show,
 	// in their global-count order, with their true (unfiltered-by-module) counts.
-	if len(data.TopModules) != 2 || data.TopModules[0].Name != "Alpha" || data.TopModules[0].Count != 2 ||
+	if len(data.TopModules) != 3 || data.TopModules[0].Name != "Alpha" || data.TopModules[0].Count != 2 ||
 		data.TopModules[1].Name != "Beta" || data.TopModules[1].Count != 1 {
 		t.Fatalf("expected module panel to stay unfiltered by its own dimension, got %+v", data.TopModules)
 	}
@@ -114,8 +118,8 @@ func TestExportService_CrossFilter(t *testing.T) {
 		t.Fatalf("expected method breakdown restricted to Alpha's 2 events, got %+v", data.MethodBreakdown)
 	}
 
-	if len(data.Users) != 2 {
-		t.Fatalf("expected both known users still listed, got %d", len(data.Users))
+	if len(data.Users) != 3 {
+		t.Fatalf("expected all known users still listed, got %d", len(data.Users))
 	}
 	var user1, user2 *entity.UserStat
 	for i := range data.Users {
@@ -146,8 +150,10 @@ func newTestService(t *testing.T) *export.ExportService {
 		sampleEvent(2, 20, "member", "Beta | Retrieve", "GET", 404, 0.05, now.AddDate(0, 0, -1)),
 		// anonymous, unclassified activity — should not count toward modules.
 		anonymousEvent("Unknown", "GET", 200, 0.01, now.AddDate(0, 0, -2)),
-		// outside the lookback window — must be excluded entirely.
+		// older than the former 2-month window — included: exports cover full history.
 		sampleEvent(3, 30, "owner", "Gamma | Old", "GET", 200, 0.3, now.AddDate(0, -3, 0)),
+		// uptime-monitoring probe — must be excluded entirely.
+		healthCheckEvent(now.AddDate(0, 0, -4)),
 	}
 
 	dir, err := os.MkdirTemp(".", "export_test_")
@@ -160,7 +166,33 @@ func newTestService(t *testing.T) *export.ExportService {
 	writeFixture(t, fixturePath, events)
 
 	repo := filerepo.NewRepository(fixturePath)
-	return export.NewExportService(repo)
+	svc := export.NewExportService(repo)
+	svc.Access = accessRepo{grantedUserID: "/dashboards/synops"}
+	return svc
+}
+
+// grantedUserID is the dashboard user the tests export as; they have been
+// granted the Synops dashboard.
+const grantedUserID = 100
+
+// accessRepo grants each user ID exactly one dashboard link.
+type accessRepo map[int64]string
+
+func (a accessRepo) HasDashboardAccess(userID int64, link string) (bool, error) {
+	return a[userID] == link, nil
+}
+
+func TestExportService_RequiresProductAccess(t *testing.T) {
+	svc := newTestService(t)
+
+	if _, err := svc.Export(export.ExportRequest{UserID: 999, Product: pkg.SynOps}); !errors.Is(err, export.ErrForbidden) {
+		t.Fatalf("user without the Synops grant: want ErrForbidden, got %v", err)
+	}
+
+	svc.Access = nil // not wired up: must fail closed
+	if _, err := svc.Export(export.ExportRequest{UserID: grantedUserID, Product: pkg.SynOps}); !errors.Is(err, export.ErrForbidden) {
+		t.Fatalf("nil Access: want ErrForbidden, got %v", err)
+	}
 }
 
 func sampleEvent(userID, orgID int64, orgRole, activityName, method string, status int, duration float64, occurredAt time.Time) entity.UserActivityEvent {
@@ -170,6 +202,13 @@ func sampleEvent(userID, orgID int64, orgRole, activityName, method string, stat
 		"organization_id":   orgID,
 		"organization_role": orgRole,
 	}
+	return e
+}
+
+func healthCheckEvent(occurredAt time.Time) entity.UserActivityEvent {
+	e := baseEvent("health-check", "GET", 200, 0.001, occurredAt)
+	e.Activity.Path = "/healthy"
+	e.Request.UserAgent = "Blackbox Exporter/0.27.0"
 	return e
 }
 

@@ -24,22 +24,26 @@ export interface RegisterRequest {
     password: string
 }
 
-// UserId uses capital casing — the Go struct has no json tag, so it serializes as-is
 export interface RegisterResponse {
-    UserId: number
+    user_id: number
 }
 
+// The session lives in an HttpOnly cookie set by /user/login — the browser
+// sends it automatically (withCredentials), so none of these take a token.
 export const authApi = {
     login: async (data: LoginRequest): Promise<LoginResponse> => {
         const response = await apiClient.post<LoginResponse>('/user/login', data)
         return response.data
     },
 
-    getUserProfile: async (userId: number): Promise<UserProfileResponse> => {
-        const response = await apiClient.get<UserProfileResponse>(
-            `/user/user_profile/${userId}`
-        )
+    /** The logged-in user's profile. 401 = not logged in. */
+    getMe: async (): Promise<UserProfileResponse> => {
+        const response = await apiClient.get<UserProfileResponse>('/user/user_profile/me')
         return response.data
+    },
+
+    logout: async (): Promise<void> => {
+        await apiClient.post('/user/logout')
     },
 
     register: async (data: RegisterRequest): Promise<RegisterResponse> => {

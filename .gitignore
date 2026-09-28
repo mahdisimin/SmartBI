@@ -1,2 +1,6 @@
 .idea/
 .gitignore
+dashboard-monitor/dist/
+/.env
+dashboard-monitor/node_modules/
+dashboard-monitor/.vite/

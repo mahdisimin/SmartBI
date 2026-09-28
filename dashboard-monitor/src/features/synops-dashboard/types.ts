@@ -62,6 +62,12 @@ export interface DashboardFilters {
     userIds: Set<number>
 }
 
+// One filter value tagged with its dimension — the union ties userIds to
+// numbers and every other dimension to strings, so no casts are needed.
+export type FilterEntry =
+    | { dim: 'days' | 'modules' | 'methods'; value: string }
+    | { dim: 'userIds'; value: number }
+
 export const emptyFilters = (): DashboardFilters => ({
     days: new Set(),
     modules: new Set(),

@@ -2,12 +2,14 @@ import type { TrendLevel } from './types'
 
 const FA_CAL = 'fa-IR-u-ca-persian-nu-latn'
 
+const FA_MONTHS = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند']
+
+/** Month keys come from the backend already in Jalali "YYYY-MM" (e.g.
+ * "1405-06" = Shahrivar 1405), so this is a lookup — not a Date conversion. */
 export function monthLabel(key: string): string {
-    return new Date(key + '-01T00:00:00Z').toLocaleDateString(FA_CAL, {
-        year: 'numeric',
-        month: 'long',
-        timeZone: 'UTC',
-    })
+    const [year, month] = key.split('-')
+    const name = FA_MONTHS[Number(month) - 1]
+    return name ? `${name} ${year}` : key
 }
 
 export function weekLabel(key: string): string {

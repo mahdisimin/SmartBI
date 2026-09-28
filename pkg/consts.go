@@ -19,10 +19,3 @@ const (
 	Req_LoginHostory SynOpsAPIURL = "https://login.synops.io"
 	Req_UserData     SynOpsAPIURL = "https://userdata.synops.io"
 )
-
-const (
-	UserName = "sa"
-	Password = "123456"
-	URL      = "."
-	Database = "SMARTBI"
-)

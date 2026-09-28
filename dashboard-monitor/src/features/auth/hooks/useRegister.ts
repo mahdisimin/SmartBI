@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { isAxiosError } from 'axios'
 import { authApi } from '@/api/auth.api'
 import type { RegisterRequest } from '@/api/auth.api'
 
@@ -20,13 +21,13 @@ export const useRegister = (): UseRegisterReturn => {
 
         try {
             const response = await authApi.register(form)
-            setSuccessUserId(Number(response.UserId))
-        } catch (err: any) {
+            setSuccessUserId(Number(response.user_id))
+        } catch (err) {
             // TODO: Map backend error codes to user-friendly messages here when codes become available
-            const message =
-                err?.response?.data?.message ??
-                'Registration failed. Please check your information and try again.'
-            setError(message)
+            const serverMessage = isAxiosError<{ message?: string }>(err)
+                ? err.response?.data?.message
+                : undefined
+            setError(serverMessage ?? 'Registration failed. Please check your information and try again.')
         } finally {
             setIsLoading(false)
         }
